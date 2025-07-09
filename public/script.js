@@ -211,12 +211,12 @@ class ZipPdfManager {
 
       // 루트 폴더 특별 처리
       if (folder.path === "") {
-        option.textContent = "📁 " + folder.name;
+        option.textContent = folder.name;
       } else {
         // 중첩 깊이에 따라 들여쓰기
         const depth = folder.path.split("/").length - 1;
         const indent = "  ".repeat(depth);
-        option.textContent = `${indent}📁 ${folder.name}`;
+        option.textContent = `${indent}${folder.name}`;
       }
 
       folderSelect.appendChild(option);
