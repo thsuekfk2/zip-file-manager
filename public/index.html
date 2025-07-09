@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZIP 파일 관리 및 파일 추가 도구</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>ZIP 파일 관리 및 파일 추가 도구</h1>
+        <p>ZIP 파일을 다운로드하고 파일을 추가하여 재압축하세요</p>
+      </header>
+
+      <main>
+        <!-- 단계 1: ZIP 파일 다운로드 -->
+        <section id="step1" class="step active">
+          <h2>ZIP 파일 다운로드</h2>
+          <div class="input-group">
+            <label for="zipUrl">ZIP 파일 URL</label>
+            <input
+              type="url"
+              id="zipUrl"
+              placeholder="https://example.com/file.zip"
+              required
+            />
+            <button id="downloadBtn" class="btn primary">
+              다운로드 & 압축 해제
+            </button>
+          </div>
+
+          <div id="downloadProgress" class="progress-container hidden">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text">다운로드 중...</div>
+          </div>
+        </section>
+
+        <!-- 단계 2: 파일 목록 표시 -->
+        <section id="step2" class="step hidden">
+          <h2>압축 해제된 파일 목록</h2>
+          <div id="fileList" class="file-list"></div>
+        </section>
+
+        <!-- 단계 3: 파일 추가 -->
+        <section id="step3" class="step hidden">
+          <h2>📁 파일 추가</h2>
+          <div class="file-upload-container">
+            <div class="input-group">
+              <label for="filename">파일명</label>
+              <input
+                type="text"
+                id="filename"
+                placeholder="파일명 (확장자 포함)"
+                required
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="targetFolder">저장할 폴더 선택</label>
+              <select id="targetFolder" required>
+                <option value="">폴더를 선택하세요</option>
+              </select>
+            </div>
+
+            <div class="file-upload-area" id="fileUploadArea">
+              <div class="upload-icon">📁</div>
+              <p>
+                파일을 드래그하여 놓거나
+                <span class="upload-link">파일 선택</span>
+              </p>
+              <input type="file" id="fileInput" hidden />
+            </div>
+
+            <button id="addFileBtn" class="btn primary" disabled>
+              파일 추가
+            </button>
+          </div>
+        </section>
+
+        <!-- 단계 4: 재압축 및 다운로드 -->
+        <section id="step4" class="step hidden">
+          <h2>재압축 및 다운로드</h2>
+          <div class="input-group">
+            <label for="outputFilename">출력 파일명</label>
+            <input
+              type="text"
+              id="outputFilename"
+              value="modified_archive.zip"
+              required
+            />
+            <button id="recompressBtn" class="btn primary">재압축</button>
+          </div>
+
+          <div id="recompressProgress" class="progress-container hidden">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text">압축 중...</div>
+          </div>
+
+          <div id="downloadResult" class="result-container hidden">
+            <div class="success-message">
+              <h3>압축 완료!</h3>
+              <p>파일이 성공적으로 재압축되었습니다.</p>
+              <button id="finalDownloadBtn" class="btn success">
+                다운로드
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- 상태 메시지 -->
+      <div id="statusMessage" class="status-message hidden"></div>
+
+      <!-- 에러 메시지 -->
+      <div id="errorMessage" class="error-message hidden"></div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

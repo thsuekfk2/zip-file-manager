@@ -1,0 +1,30 @@
+{
+  "name": "zip-file-manager",
+  "version": "1.0.0",
+  "description": "ZIP 파일 관리 및 FILE 추가 도구 - Fastify 기반 웹 애플리케이션",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "zip",
+    "file",
+    "fastify",
+    "file-management"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/static": "^6.12.0",
+    "@fastify/multipart": "^8.0.0",
+    "@fastify/cors": "^8.4.0",
+    "axios": "^1.6.2",
+    "yauzl": "^2.10.0",
+    "archiver": "^6.0.1",
+    "tmp": "^0.2.1",
+    "fs-extra": "^11.1.1",
+    "uuid": "^9.0.1"
+  }
+}
