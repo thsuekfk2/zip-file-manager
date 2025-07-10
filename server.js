@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const fastify = require("fastify")({ logger: true });
 const path = require("path");
 const fs = require("fs-extra");
@@ -6,6 +8,7 @@ const yauzl = require("yauzl");
 const archiver = require("archiver");
 const tmp = require("tmp");
 const { v4: uuidv4 } = require("uuid");
+const FTP = require("ftp");
 
 // 플러그인 등록
 fastify.register(require("@fastify/static"), {
@@ -75,15 +78,14 @@ fastify.post("/api/download-zip", async (request, reply) => {
     });
 
     // 백그라운드에서 실제 다운로드 및 압축 해제 처리
-    processDownload(sessionId, url, zipPath, extractDir).catch(error => {
+    processDownload(sessionId, url, zipPath, extractDir).catch((error) => {
       console.error("백그라운드 다운로드 오류:", error);
       downloadProgress.set(sessionId, {
-        phase: 'error',
+        phase: "error",
         progress: 0,
-        error: error.message
+        error: error.message,
       });
     });
-
   } catch (error) {
     console.error("ZIP 다운로드 오류:", error);
     return reply.status(500).send({
@@ -104,28 +106,30 @@ async function processDownload(sessionId, url, zipPath, extractDir) {
       timeout: 30000,
     });
 
-    const totalSize = parseInt(response.headers['content-length'], 10);
+    const totalSize = parseInt(response.headers["content-length"], 10);
     let downloadedSize = 0;
 
     // 진행률 초기화
     downloadProgress.set(sessionId, {
-      phase: 'downloading',
+      phase: "downloading",
       progress: 0,
       totalSize: totalSize,
-      downloadedSize: 0
+      downloadedSize: 0,
     });
 
     const writer = fs.createWriteStream(zipPath);
-    
-    response.data.on('data', (chunk) => {
+
+    response.data.on("data", (chunk) => {
       downloadedSize += chunk.length;
-      const progress = totalSize ? Math.round((downloadedSize / totalSize) * 100) : 0;
-      
+      const progress = totalSize
+        ? Math.round((downloadedSize / totalSize) * 100)
+        : 0;
+
       downloadProgress.set(sessionId, {
-        phase: 'downloading',
+        phase: "downloading",
         progress: progress,
         totalSize: totalSize,
-        downloadedSize: downloadedSize
+        downloadedSize: downloadedSize,
       });
     });
 
@@ -134,10 +138,10 @@ async function processDownload(sessionId, url, zipPath, extractDir) {
     await new Promise((resolve, reject) => {
       writer.on("finish", () => {
         downloadProgress.set(sessionId, {
-          phase: 'extracting',
+          phase: "extracting",
           progress: 100,
           totalSize: totalSize,
-          downloadedSize: downloadedSize
+          downloadedSize: downloadedSize,
         });
         resolve();
       });
@@ -192,23 +196,22 @@ async function processDownload(sessionId, url, zipPath, extractDir) {
 
     // 압축 해제 완료 후 진행률 업데이트
     downloadProgress.set(sessionId, {
-      phase: 'completed',
+      phase: "completed",
       progress: 100,
       totalSize: totalSize,
       downloadedSize: downloadedSize,
       files,
-      folders
+      folders,
     });
 
     // 10분 후 자동 정리
     setTimeout(() => cleanupSession(sessionId), 10 * 60 * 1000);
-
   } catch (error) {
     console.error("백그라운드 다운로드 오류:", error);
     downloadProgress.set(sessionId, {
-      phase: 'error',
+      phase: "error",
       progress: 0,
-      error: error.message
+      error: error.message,
     });
     throw error;
   }
@@ -430,6 +433,315 @@ fastify.get("/api/download/:sessionId/:filename", async (request, reply) => {
     });
   }
 });
+
+// FTP 서버에 파일 업로드
+fastify.post("/api/upload-to-server", async (request, reply) => {
+  const { sessionId, remoteFilename } = request.body;
+
+  console.log("FTP 업로드 요청 받음:", { sessionId, remoteFilename });
+
+  try {
+    const session = sessions.get(sessionId);
+    if (!session || !session.compressedFile) {
+      console.log("세션 또는 압축 파일을 찾을 수 없음:", {
+        sessionExists: !!session,
+        compressedFileExists: !!(session && session.compressedFile),
+      });
+      return reply.status(404).send({ error: "압축 파일을 찾을 수 없습니다." });
+    }
+
+    const localFilePath = session.compressedFile.path;
+    const baseRemotePath = process.env.FTP_BASE_PATH || "/";
+    const filename = remoteFilename || session.compressedFile.filename;
+    // 경로 정규화 (중복 슬래시 제거)
+    const remotePath = `${baseRemotePath}${
+      baseRemotePath.endsWith("/") ? "" : "/"
+    }${filename}`.replace(/\/+/g, "/");
+
+    console.log("FTP 업로드 정보:", { localFilePath, remotePath, filename });
+
+    // FTP 설정 (환경변수 또는 기본값)
+    const ftpConfig = {
+      host: process.env.FTP_HOST || "localhost",
+      port: parseInt(process.env.FTP_PORT) || 21,
+      user: process.env.FTP_USERNAME || "anonymous",
+      password: process.env.FTP_PASSWORD || "",
+    };
+
+    console.log("FTP 설정:", {
+      host: ftpConfig.host,
+      port: ftpConfig.port,
+      user: ftpConfig.user,
+    });
+
+    // FTP 업로드 실행
+    const uploadResult = await uploadToFTPServer(
+      localFilePath,
+      remotePath,
+      ftpConfig
+    );
+
+    console.log("FTP 업로드 성공:", uploadResult);
+
+    // 웹 접근 URL 생성
+    const webAccessUrl = process.env.WEB_ACCESS_URL;
+    const downloadUrl = webAccessUrl ? `${webAccessUrl}/${filename}` : null;
+
+    return reply.send({
+      success: true,
+      message: "파일이 성공적으로 FTP 서버에 업로드되었습니다.",
+      remotePath: uploadResult.remotePath,
+      fileSize: uploadResult.fileSize,
+      downloadUrl: downloadUrl,
+      filename: filename,
+    });
+  } catch (error) {
+    console.error("FTP 업로드 오류:", error);
+    console.error("오류 스택:", error.stack);
+    return reply.status(500).send({
+      error: "FTP 서버 업로드 중 오류가 발생했습니다.",
+      details: error.message,
+    });
+  }
+});
+
+// FTP 서버 폴더 조회
+fastify.get("/api/browse-server/:sessionId", async (request, reply) => {
+  try {
+    // FTP 설정
+    const ftpConfig = {
+      host: process.env.FTP_HOST || "localhost",
+      port: parseInt(process.env.FTP_PORT) || 21,
+      user: process.env.FTP_USERNAME || "anonymous",
+      password: process.env.FTP_PASSWORD || "",
+    };
+
+    // 조회할 경로
+    const browsePath = process.env.FTP_BASE_PATH;
+
+    // FTP 폴더 조회 실행
+    const fileList = await browseFTPDirectory(browsePath, ftpConfig);
+
+    return reply.send({
+      success: true,
+      path: browsePath,
+      files: fileList,
+      message: "FTP 서버 폴더 조회가 완료되었습니다.",
+    });
+  } catch (error) {
+    console.error("FTP 폴더 조회 오류:", error);
+    return reply.status(500).send({
+      error: "FTP 서버 폴더 조회 중 오류가 발생했습니다.",
+      details: error.message,
+    });
+  }
+});
+
+// FTP 서버 파일 존재 확인
+fastify.post("/api/check-server-file", async (request, reply) => {
+  const { sessionId, filename } = request.body;
+
+  console.log("FTP 파일 존재 확인 요청:", { sessionId, filename });
+
+  try {
+    const session = sessions.get(sessionId);
+    if (!session || !session.compressedFile) {
+      return reply.status(404).send({ error: "압축 파일을 찾을 수 없습니다." });
+    }
+
+    const baseRemotePath = process.env.FTP_BASE_PATH || "/";
+    const remotePath = `${baseRemotePath}${
+      baseRemotePath.endsWith("/") ? "" : "/"
+    }${filename}`.replace(/\/+/g, "/");
+
+    // FTP 설정
+    const ftpConfig = {
+      host: process.env.FTP_HOST || "localhost",
+      port: parseInt(process.env.FTP_PORT) || 21,
+      user: process.env.FTP_USERNAME || "anonymous",
+      password: process.env.FTP_PASSWORD || "",
+    };
+
+    // FTP 서버에서 파일 존재 확인
+    const fileExists = await checkFTPFileExists(remotePath, ftpConfig);
+
+    return reply.send({
+      success: true,
+      exists: fileExists,
+      filename: filename,
+      remotePath: remotePath,
+    });
+  } catch (error) {
+    console.error("FTP 파일 존재 확인 오류:", error);
+    return reply.status(500).send({
+      error: "FTP 서버 파일 확인 중 오류가 발생했습니다.",
+      details: error.message,
+    });
+  }
+});
+
+// FTP 폴더 조회 함수
+function browseFTPDirectory(remotePath, ftpConfig) {
+  return new Promise((resolve, reject) => {
+    const client = new FTP();
+
+    client.on("ready", () => {
+      console.log("FTP 연결 성공 (조회)");
+
+      // 디렉토리 목록 조회
+      client.list(remotePath, (err, list) => {
+        client.end();
+
+        if (err) {
+          return reject(err);
+        }
+
+        // 파일 목록 정리
+        const fileList = list.map((item) => ({
+          name: item.name,
+          type: item.type === "d" ? "directory" : "file",
+          size: item.size,
+          date: item.date,
+          permissions: item.rights
+            ? item.rights.user + item.rights.group + item.rights.other
+            : "",
+        }));
+
+        console.log(
+          `FTP 폴더 조회 완료: ${remotePath} (${fileList.length}개 항목)`
+        );
+        resolve(fileList);
+      });
+    });
+
+    client.on("error", (err) => {
+      console.error("FTP 연결 오류 (조회):", err);
+      reject(err);
+    });
+
+    // FTP 서버 연결
+    client.connect(ftpConfig);
+  });
+}
+
+// FTP 파일 존재 확인 함수
+function checkFTPFileExists(remotePath, ftpConfig) {
+  return new Promise((resolve, reject) => {
+    const client = new FTP();
+    let connectionTimedOut = false;
+
+    // 연결 타임아웃 설정 (10초)
+    const timeout = setTimeout(() => {
+      connectionTimedOut = true;
+      client.destroy();
+      reject(new Error("FTP 연결 시간 초과 (파일 확인)"));
+    }, 10000);
+
+    client.on("ready", () => {
+      clearTimeout(timeout);
+      console.log("FTP 연결 성공 (파일 확인)");
+
+      // 파일 크기 확인으로 존재 여부 판단
+      client.size(remotePath, (err, size) => {
+        client.end();
+
+        if (err) {
+          // 파일이 없거나 접근할 수 없는 경우
+          console.log(`FTP 파일 존재 확인: ${remotePath} - 없음`);
+          resolve(false);
+        } else {
+          // 파일이 존재하는 경우
+          console.log(
+            `FTP 파일 존재 확인: ${remotePath} - 있음 (${size} bytes)`
+          );
+          resolve(true);
+        }
+      });
+    });
+
+    client.on("error", (err) => {
+      clearTimeout(timeout);
+      if (!connectionTimedOut) {
+        console.error("FTP 연결 오류 (파일 확인):", err);
+        // 연결 오류 시에도 파일이 없는 것으로 간주
+        resolve(false);
+      }
+    });
+
+    console.log("FTP 서버 연결 시도 (파일 확인):", ftpConfig);
+    client.connect(ftpConfig);
+  });
+}
+
+// FTP 업로드 함수
+function uploadToFTPServer(localFilePath, remotePath, ftpConfig) {
+  return new Promise((resolve, reject) => {
+    const client = new FTP();
+    let connectionTimedOut = false;
+
+    // 연결 타임아웃 설정 (30초)
+    const timeout = setTimeout(() => {
+      connectionTimedOut = true;
+      client.destroy();
+      reject(new Error("FTP 연결 시간 초과"));
+    }, 30000);
+
+    client.on("ready", () => {
+      clearTimeout(timeout);
+      console.log("FTP 연결 성공 (업로드)");
+
+      // 로컬 파일 존재 확인
+      if (!fs.existsSync(localFilePath)) {
+        client.end();
+        return reject(
+          new Error(`로컬 파일을 찾을 수 없습니다: ${localFilePath}`)
+        );
+      }
+
+      console.log(`파일 업로드 시작: ${localFilePath} -> ${remotePath}`);
+
+      // 파일 업로드
+      client.put(localFilePath, remotePath, (err) => {
+        if (err) {
+          console.error("FTP 업로드 실패:", err);
+          client.end();
+          return reject(new Error(`FTP 업로드 실패: ${err.message}`));
+        }
+
+        const fileStats = fs.statSync(localFilePath);
+
+        console.log(
+          `파일 업로드 완료: ${remotePath} (${fileStats.size} bytes)`
+        );
+        client.end();
+
+        resolve({
+          remotePath: remotePath,
+          fileSize: fileStats.size,
+        });
+      });
+    });
+
+    client.on("error", (err) => {
+      clearTimeout(timeout);
+      if (!connectionTimedOut) {
+        console.error("FTP 연결 오류 (업로드):", err);
+        reject(new Error(`FTP 연결 오류: ${err.message}`));
+      }
+    });
+
+    client.on("close", (hadError) => {
+      console.log(
+        "FTP 연결 종료 (업로드):",
+        hadError ? "오류로 인한 종료" : "정상 종료"
+      );
+    });
+
+    console.log("FTP 서버 연결 시도 (업로드):", ftpConfig);
+    // FTP 서버 연결
+    client.connect(ftpConfig);
+  });
+}
 
 // 파일 목록 생성 함수 (폴더 구조 포함)
 async function getFileList(dir) {
