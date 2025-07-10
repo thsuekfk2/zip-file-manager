@@ -18,8 +18,6 @@ services:
       - WEB_ACCESS_URL=${WEB_ACCESS_URL}
     env_file:
       - .env
-    networks:
-      - zip-manager-network
     healthcheck:
       test:
         [
@@ -32,7 +30,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-networks:
-  zip-manager-network:
-    driver: bridge
