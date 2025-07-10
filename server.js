@@ -543,6 +543,46 @@ fastify.get("/api/browse-server/:sessionId", async (request, reply) => {
   }
 });
 
+// FTP 연결 테스트
+fastify.get("/api/test-ftp-connection", async (request, reply) => {
+  console.log("FTP 연결 테스트 요청 받음");
+
+  try {
+    // FTP 설정
+    const ftpConfig = {
+      host: process.env.FTP_HOST || "localhost",
+      port: parseInt(process.env.FTP_PORT) || 21,
+      user: process.env.FTP_USERNAME || "anonymous",
+      password: process.env.FTP_PASSWORD || "",
+      connTimeout: 10000,
+      pasvTimeout: 10000,
+      keepalive: 10000,
+    };
+
+    console.log("FTP 연결 테스트 설정:", {
+      host: ftpConfig.host,
+      port: ftpConfig.port,
+      user: ftpConfig.user,
+    });
+
+    // FTP 연결 테스트 실행
+    const testResult = await testFTPConnection(ftpConfig);
+
+    return reply.send({
+      success: true,
+      message: "FTP 서버 연결이 성공했습니다.",
+      details: testResult,
+    });
+  } catch (error) {
+    console.error("FTP 연결 테스트 오류:", error);
+    return reply.status(500).send({
+      success: false,
+      error: "FTP 서버 연결에 실패했습니다.",
+      details: error.message,
+    });
+  }
+});
+
 // FTP 서버 파일 존재 확인
 fastify.post("/api/check-server-file", async (request, reply) => {
   const { sessionId, filename } = request.body;
@@ -698,7 +738,7 @@ function uploadToFTPServer(localFilePath, remotePath, ftpConfig) {
     client.on("ready", () => {
       clearTimeout(timeout);
       console.log("FTP 연결 성공 (업로드)");
-      
+
       // passive 모드 설정
       client.ascii((err) => {
         if (err) console.log("ASCII 모드 설정 오류:", err);
@@ -753,6 +793,62 @@ function uploadToFTPServer(localFilePath, remotePath, ftpConfig) {
 
     console.log("FTP 서버 연결 시도 (업로드):", ftpConfig);
     // FTP 서버 연결
+    client.connect(ftpConfig);
+  });
+}
+
+// FTP 연결 테스트 함수
+function testFTPConnection(ftpConfig) {
+  return new Promise((resolve, reject) => {
+    const client = new FTP();
+    let connectionTimedOut = false;
+
+    // 연결 타임아웃 설정 (10초)
+    const timeout = setTimeout(() => {
+      connectionTimedOut = true;
+      client.destroy();
+      reject(new Error("FTP 연결 시간 초과"));
+    }, 10000);
+
+    client.on("ready", () => {
+      clearTimeout(timeout);
+      console.log("FTP 연결 성공 (테스트)");
+
+      // 간단한 pwd 명령으로 연결 확인
+      client.pwd((err, dir) => {
+        client.end();
+
+        if (err) {
+          console.log("PWD 명령 오류:", err);
+          resolve({
+            connected: true,
+            message: "연결은 성공했지만 디렉토리 정보를 가져올 수 없습니다.",
+            currentDir: "알 수 없음",
+          });
+        } else {
+          console.log("현재 디렉토리:", dir);
+          resolve({
+            connected: true,
+            message: "FTP 서버 연결이 성공했습니다.",
+            currentDir: dir,
+          });
+        }
+      });
+    });
+
+    client.on("error", (err) => {
+      clearTimeout(timeout);
+      if (!connectionTimedOut) {
+        console.error("FTP 연결 오류 (테스트):", err);
+        reject(new Error(`FTP 연결 오류: ${err.message}`));
+      }
+    });
+
+    client.on("greeting", (msg) => {
+      console.log("FTP 서버 인사말 (테스트):", msg);
+    });
+
+    console.log("FTP 서버 연결 시도 (테스트):", ftpConfig);
     client.connect(ftpConfig);
   });
 }

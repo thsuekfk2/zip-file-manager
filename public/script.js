@@ -17,6 +17,11 @@ class ZipPdfManager {
       this.downloadZip();
     });
 
+    // FTP 연결 테스트
+    document.getElementById("testFtpBtn").addEventListener("click", () => {
+      this.testFtpConnection();
+    });
+
     // 3단계: 파일 업로드
     this.setupFileUpload();
 
@@ -71,6 +76,29 @@ class ZipPdfManager {
     document.getElementById("targetFolder").addEventListener("change", () => {
       this.validateFileForm();
     });
+  }
+
+  async testFtpConnection() {
+    const testBtn = document.getElementById("testFtpBtn");
+    testBtn.disabled = true;
+    testBtn.textContent = "연결 테스트 중...";
+
+    try {
+      const response = await fetch("/api/test-ftp-connection");
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`✅ ${data.message}\n현재 디렉토리: ${data.details.currentDir}`);
+      } else {
+        this.showError(`❌ FTP 연결 실패: ${data.details || data.error}`);
+      }
+    } catch (error) {
+      console.error("FTP 연결 테스트 오류:", error);
+      this.showError(`❌ FTP 연결 테스트 실패: ${error.message}`);
+    } finally {
+      testBtn.disabled = false;
+      testBtn.textContent = "FTP 연결 테스트";
+    }
   }
 
   setupFileUpload() {
