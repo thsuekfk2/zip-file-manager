@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  zip-manager:
+    build: .
+    container_name: zip-file-manager
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT}:${PORT}"
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT}
+    env_file:
+      - .env
+    networks:
+      - zip-manager-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  zip-manager-network:
+    driver: bridge

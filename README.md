@@ -67,7 +67,6 @@ zip-program/
 ├── package.json             # 의존성 관리
 ├── README.md               # 프로젝트 문서
 ├── .env                    # 환경 변수 (FTP 서버 정보)
-├── .env.example            # 환경 변수 예제
 ├── .gitignore              # Git 무시 파일 목록
 ├── public/                 # 정적 파일
 │   ├── index.html          # 메인 UI (5단계 워크플로우)
@@ -113,6 +112,58 @@ npm start
 
 ```
 http://localhost:3000
+```
+
+## 🐳 Docker 배포
+
+### Docker Compose 사용 (권장)
+
+#### 1. 프로덕션 배포
+
+```bash
+
+# Docker Compose로 실행
+docker-compose up -d
+
+# 로그 확인
+docker-compose logs -f
+```
+
+#### 2. 개발 환경
+
+```bash
+# 개발용 Docker Compose 실행
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+### Docker 직접 사용
+
+```bash
+# 이미지 빌드
+docker build -t zip-file-manager .
+
+# 컨테이너 실행
+docker run -d \
+  --name zip-file-manager \
+  -p 3000:3000 \
+  --env-file .env \
+  zip-file-manager
+```
+
+### npm 스크립트 사용
+
+```bash
+# Docker 이미지 빌드
+npm run docker:build
+
+# 프로덕션 실행
+npm run docker:run
+
+# 컨테이너 중지
+npm run docker:stop
+
+# 로그 확인
+npm run docker:logs
 ```
 
 ## 사용 방법
