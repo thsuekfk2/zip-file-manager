@@ -25,6 +25,9 @@ fastify.register(require("@fastify/cors"));
 // 세션 데이터 저장
 const sessions = new Map();
 
+// 다운로드 진행률 저장
+const downloadProgress = new Map();
+
 // 임시 파일 정리 함수
 const cleanupSession = (sessionId) => {
   const session = sessions.get(sessionId);
@@ -32,6 +35,7 @@ const cleanupSession = (sessionId) => {
     fs.removeSync(session.tempDir);
   }
   sessions.delete(sessionId);
+  downloadProgress.delete(sessionId);
 };
 
 // 메인 페이지
@@ -55,6 +59,43 @@ fastify.post("/api/download-zip", async (request, reply) => {
     const zipPath = path.join(tempDir.name, "downloaded.zip");
     const extractDir = path.join(tempDir.name, "extracted");
 
+    // 세션 데이터 미리 저장 (진행률 추적을 위해)
+    sessions.set(sessionId, {
+      tempDir: tempDir.name,
+      extractDir,
+      files: [],
+      folders: [],
+    });
+
+    // 즉시 sessionId 응답 후 백그라운드에서 다운로드 처리
+    reply.send({
+      success: true,
+      sessionId,
+      message: "다운로드를 시작합니다.",
+    });
+
+    // 백그라운드에서 실제 다운로드 및 압축 해제 처리
+    processDownload(sessionId, url, zipPath, extractDir).catch(error => {
+      console.error("백그라운드 다운로드 오류:", error);
+      downloadProgress.set(sessionId, {
+        phase: 'error',
+        progress: 0,
+        error: error.message
+      });
+    });
+
+  } catch (error) {
+    console.error("ZIP 다운로드 오류:", error);
+    return reply.status(500).send({
+      error: "ZIP 파일 다운로드 중 오류가 발생했습니다.",
+      details: error.message,
+    });
+  }
+});
+
+// 백그라운드 다운로드 처리 함수
+async function processDownload(sessionId, url, zipPath, extractDir) {
+  try {
     // ZIP 파일 다운로드
     const response = await axios({
       method: "GET",
@@ -63,11 +104,43 @@ fastify.post("/api/download-zip", async (request, reply) => {
       timeout: 30000,
     });
 
+    const totalSize = parseInt(response.headers['content-length'], 10);
+    let downloadedSize = 0;
+
+    // 진행률 초기화
+    downloadProgress.set(sessionId, {
+      phase: 'downloading',
+      progress: 0,
+      totalSize: totalSize,
+      downloadedSize: 0
+    });
+
     const writer = fs.createWriteStream(zipPath);
+    
+    response.data.on('data', (chunk) => {
+      downloadedSize += chunk.length;
+      const progress = totalSize ? Math.round((downloadedSize / totalSize) * 100) : 0;
+      
+      downloadProgress.set(sessionId, {
+        phase: 'downloading',
+        progress: progress,
+        totalSize: totalSize,
+        downloadedSize: downloadedSize
+      });
+    });
+
     response.data.pipe(writer);
 
     await new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
+      writer.on("finish", () => {
+        downloadProgress.set(sessionId, {
+          phase: 'extracting',
+          progress: 100,
+          totalSize: totalSize,
+          downloadedSize: downloadedSize
+        });
+        resolve();
+      });
       writer.on("error", reject);
     });
 
@@ -109,31 +182,48 @@ fastify.post("/api/download-zip", async (request, reply) => {
     // 파일 목록 생성
     const { files, folders } = await getFileList(extractDir);
 
-    // 세션 저장
-    sessions.set(sessionId, {
-      tempDir: tempDir.name,
-      extractDir,
+    // 세션 업데이트
+    const session = sessions.get(sessionId);
+    if (session) {
+      session.files = files;
+      session.folders = folders;
+      sessions.set(sessionId, session);
+    }
+
+    // 압축 해제 완료 후 진행률 업데이트
+    downloadProgress.set(sessionId, {
+      phase: 'completed',
+      progress: 100,
+      totalSize: totalSize,
+      downloadedSize: downloadedSize,
       files,
-      folders,
+      folders
     });
 
     // 10분 후 자동 정리
     setTimeout(() => cleanupSession(sessionId), 10 * 60 * 1000);
 
-    return reply.send({
-      success: true,
-      sessionId,
-      files,
-      folders,
-      message: "ZIP 파일이 성공적으로 다운로드되고 압축 해제되었습니다.",
-    });
   } catch (error) {
-    console.error("ZIP 다운로드 오류:", error);
-    return reply.status(500).send({
-      error: "ZIP 파일 다운로드 중 오류가 발생했습니다.",
-      details: error.message,
+    console.error("백그라운드 다운로드 오류:", error);
+    downloadProgress.set(sessionId, {
+      phase: 'error',
+      progress: 0,
+      error: error.message
     });
+    throw error;
   }
+}
+
+// 다운로드 진행률 조회
+fastify.get("/api/progress/:sessionId", async (request, reply) => {
+  const { sessionId } = request.params;
+  const progress = downloadProgress.get(sessionId);
+
+  if (!progress) {
+    return reply.status(404).send({ error: "진행률 정보를 찾을 수 없습니다." });
+  }
+
+  return reply.send(progress);
 });
 
 // 파일 목록 조회

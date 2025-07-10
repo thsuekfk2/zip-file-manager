@@ -135,32 +135,144 @@ class ZipPdfManager {
     this.showProgress("downloadProgress", "다운로드 중...");
 
     try {
-      const response = await fetch("/api/download-zip", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      const data = await response.json();
+      // 다운로드 요청을 백그라운드에서 시작
+      const downloadPromise = this.startDownloadWithProgress(url);
+      const data = await downloadPromise;
 
       if (data.success) {
         this.sessionId = data.sessionId;
         this.showStatus(data.message);
-        this.displayFileList(data.files);
-        this.populateFolderOptions(data.folders);
-        this.setDefaultOutputFilename(url);
-        this.showStep(2);
-        setTimeout(() => this.showStep(3), 1000);
+        // 진행률 폴링을 통해 완료되면 다음 단계로 진행
+        this.waitForCompletion(data.sessionId, url);
       } else {
         this.showError(data.error || "다운로드 중 오류가 발생했습니다.");
       }
     } catch (error) {
       console.error("다운로드 오류:", error);
       this.showError("서버와 통신 중 오류가 발생했습니다.");
-    } finally {
       this.hideProgress("downloadProgress");
+    }
+  }
+
+  // 다운로드 완료를 기다리는 함수
+  async waitForCompletion(sessionId, url) {
+    const checkInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/progress/${sessionId}`);
+        if (response.ok) {
+          const progressData = await response.json();
+          
+          if (progressData.phase === 'completed' && progressData.files && progressData.folders) {
+            clearInterval(checkInterval);
+            
+            // 완료되면 파일 목록 표시하고 다음 단계로 진행
+            this.displayFileList(progressData.files);
+            this.populateFolderOptions(progressData.folders);
+            this.setDefaultOutputFilename(url);
+            this.showStatus("ZIP 파일이 성공적으로 다운로드되고 압축 해제되었습니다.");
+            this.showStep(2);
+            setTimeout(() => this.showStep(3), 1000);
+            this.hideProgress("downloadProgress");
+          } else if (progressData.phase === 'error') {
+            clearInterval(checkInterval);
+            this.showError(progressData.error || "다운로드 중 오류가 발생했습니다.");
+            this.hideProgress("downloadProgress");
+          }
+        }
+      } catch (error) {
+        console.error("완료 확인 오류:", error);
+        clearInterval(checkInterval);
+        this.hideProgress("downloadProgress");
+      }
+    }, 1000); // 1초마다 확인
+
+    // 5분 후 타임아웃
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      this.showError("다운로드 시간이 초과되었습니다.");
+      this.hideProgress("downloadProgress");
+    }, 5 * 60 * 1000);
+  }
+
+  // 다운로드와 진행률 추적을 함께 처리하는 함수
+  async startDownloadWithProgress(url) {
+    // 먼저 다운로드 요청을 시작하고 sessionId를 받음
+    const response = await fetch("/api/download-zip", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      // sessionId를 받자마자 진행률 추적 시작
+      this.pollProgress(data.sessionId);
+    }
+
+    return data;
+  }
+
+  // 진행률 폴링 함수
+  async pollProgress(sessionId) {
+    if (!sessionId) return;
+
+    const progressInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/progress/${sessionId}`);
+        if (response.ok) {
+          const progressData = await response.json();
+          this.updateProgress("downloadProgress", progressData);
+          
+          if (progressData.phase === 'completed') {
+            clearInterval(progressInterval);
+          }
+        } else {
+          clearInterval(progressInterval);
+        }
+      } catch (error) {
+        console.error("진행률 확인 오류:", error);
+        clearInterval(progressInterval);
+      }
+    }, 500); // 0.5초마다 확인
+
+    // 30초 후 자동 정리
+    setTimeout(() => clearInterval(progressInterval), 30000);
+  }
+
+  // 진행률 업데이트 함수
+  updateProgress(containerId, progressData) {
+    const container = document.getElementById(containerId);
+    const progressFill = container.querySelector('.progress-fill');
+    const progressText = container.querySelector('.progress-text');
+    
+    if (progressFill) {
+      progressFill.style.width = `${progressData.progress}%`;
+    }
+    
+    if (progressText) {
+      let text = '';
+      switch (progressData.phase) {
+        case 'downloading':
+          text = `다운로드 중... ${progressData.progress}%`;
+          if (progressData.totalSize) {
+            const mbDownloaded = (progressData.downloadedSize / 1024 / 1024).toFixed(1);
+            const mbTotal = (progressData.totalSize / 1024 / 1024).toFixed(1);
+            text += ` (${mbDownloaded}MB / ${mbTotal}MB)`;
+          }
+          break;
+        case 'extracting':
+          text = '압축 해제 중...';
+          break;
+        case 'completed':
+          text = '완료';
+          break;
+        default:
+          text = '처리 중...';
+      }
+      progressText.textContent = text;
     }
   }
 
