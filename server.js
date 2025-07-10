@@ -466,6 +466,9 @@ fastify.post("/api/upload-to-server", async (request, reply) => {
       port: parseInt(process.env.FTP_PORT) || 21,
       user: process.env.FTP_USERNAME || "anonymous",
       password: process.env.FTP_PASSWORD || "",
+      connTimeout: 30000,
+      pasvTimeout: 30000,
+      keepalive: 30000,
     };
 
     console.log("FTP 설정:", {
@@ -514,6 +517,9 @@ fastify.get("/api/browse-server/:sessionId", async (request, reply) => {
       port: parseInt(process.env.FTP_PORT) || 21,
       user: process.env.FTP_USERNAME || "anonymous",
       password: process.env.FTP_PASSWORD || "",
+      connTimeout: 30000,
+      pasvTimeout: 30000,
+      keepalive: 30000,
     };
 
     // 조회할 경로
@@ -560,6 +566,9 @@ fastify.post("/api/check-server-file", async (request, reply) => {
       port: parseInt(process.env.FTP_PORT) || 21,
       user: process.env.FTP_USERNAME || "anonymous",
       password: process.env.FTP_PASSWORD || "",
+      connTimeout: 30000,
+      pasvTimeout: 30000,
+      keepalive: 30000,
     };
 
     // FTP 서버에서 파일 존재 확인
@@ -689,6 +698,11 @@ function uploadToFTPServer(localFilePath, remotePath, ftpConfig) {
     client.on("ready", () => {
       clearTimeout(timeout);
       console.log("FTP 연결 성공 (업로드)");
+      
+      // passive 모드 설정
+      client.ascii((err) => {
+        if (err) console.log("ASCII 모드 설정 오류:", err);
+      });
 
       // 로컬 파일 존재 확인
       if (!fs.existsSync(localFilePath)) {
