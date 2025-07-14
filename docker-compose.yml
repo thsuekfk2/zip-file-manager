@@ -10,11 +10,11 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=${PORT}
-      - FTP_HOST=${FTP_HOST}
-      - FTP_PORT=${FTP_PORT}
-      - FTP_USERNAME=${FTP_USERNAME}
-      - FTP_PASSWORD=${FTP_PASSWORD}
-      - FTP_BASE_PATH=${FTP_BASE_PATH}
+      - SFTP_HOST=${SFTP_HOST}
+      - SFTP_PORT=${SFTP_PORT}
+      - SFTP_USERNAME=${SFTP_USERNAME}
+      - SFTP_PASSWORD=${SFTP_PASSWORD}
+      - SFTP_BASE_PATH=${SFTP_BASE_PATH}
       - WEB_ACCESS_URL=${WEB_ACCESS_URL}
     env_file:
       - .env

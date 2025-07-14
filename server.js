@@ -8,7 +8,64 @@ const yauzl = require("yauzl");
 const archiver = require("archiver");
 const tmp = require("tmp");
 const { v4: uuidv4 } = require("uuid");
-const FTP = require("ftp");
+// ===== SFTP 라이브러리 초기화 =====
+let SftpClient = null;
+try {
+  SftpClient = require('ssh2-sftp-client');
+  console.log('✅ ssh2-sftp-client 라이브러리 로드 성공');
+} catch (error) {
+  console.log('❌ ssh2-sftp-client 설치 필요: npm install ssh2-sftp-client');
+}
+
+// ===== SFTP 설정 =====
+const SFTP_CONFIG = {
+  PORT: 22,
+  TIMEOUT: 30000,
+  ALGORITHMS: {
+    serverHostKey: ['ssh-rsa', 'ecdsa-sha2-nistp256'],
+    kex: ['diffie-hellman-group14-sha256', 'ecdh-sha2-nistp256'],
+    cipher: ['aes128-ctr', 'aes256-ctr'],
+    hmac: ['hmac-sha2-256', 'hmac-sha1']
+  }
+};
+
+// ===== SFTP 유틸리티 함수 =====
+const SftpUtils = {
+  createConfig: (host, username, password, port = SFTP_CONFIG.PORT) => ({
+    host,
+    port,
+    username,
+    password,
+    readyTimeout: SFTP_CONFIG.TIMEOUT,
+    algorithms: SFTP_CONFIG.ALGORITHMS,
+    hostHash: 'md5',
+    hostVerifier: () => true
+  }),
+
+  async executeWithClient(sftpConfig, operation) {
+    if (!SftpClient) {
+      throw new Error('ssh2-sftp-client 라이브러리가 설치되지 않았습니다');
+    }
+    
+    const sftp = new SftpClient();
+    try {
+      await sftp.connect(sftpConfig);
+      
+      // pwd 메서드 호환성 패치
+      if (typeof sftp.pwd !== 'function') {
+        sftp.pwd = async () => '/';
+      }
+      
+      return await operation(sftp);
+    } finally {
+      try {
+        await sftp.end();
+      } catch (error) {
+        console.warn('SFTP 연결 종료 중 오류:', error.message);
+      }
+    }
+  }
+};
 
 // 플러그인 등록
 fastify.register(require("@fastify/static"), {
@@ -434,11 +491,11 @@ fastify.get("/api/download/:sessionId/:filename", async (request, reply) => {
   }
 });
 
-// FTP 서버에 파일 업로드
+// SFTP 서버에 파일 업로드
 fastify.post("/api/upload-to-server", async (request, reply) => {
   const { sessionId, remoteFilename } = request.body;
 
-  console.log("FTP 업로드 요청 받음:", { sessionId, remoteFilename });
+  console.log("SFTP 업로드 요청 받음:", { sessionId, remoteFilename });
 
   try {
     const session = sessions.get(sessionId);
@@ -451,40 +508,37 @@ fastify.post("/api/upload-to-server", async (request, reply) => {
     }
 
     const localFilePath = session.compressedFile.path;
-    const baseRemotePath = process.env.FTP_BASE_PATH || "/";
+    const baseRemotePath = process.env.SFTP_BASE_PATH || "/";
     const filename = remoteFilename || session.compressedFile.filename;
     // 경로 정규화 (중복 슬래시 제거)
     const remotePath = `${baseRemotePath}${
       baseRemotePath.endsWith("/") ? "" : "/"
     }${filename}`.replace(/\/+/g, "/");
 
-    console.log("FTP 업로드 정보:", { localFilePath, remotePath, filename });
+    console.log("SFTP 업로드 정보:", { localFilePath, remotePath, filename });
 
-    // FTP 설정 (환경변수 또는 기본값)
-    const ftpConfig = {
-      host: process.env.FTP_HOST || "localhost",
-      port: parseInt(process.env.FTP_PORT) || 21,
-      user: process.env.FTP_USERNAME || "anonymous",
-      password: process.env.FTP_PASSWORD || "",
-      connTimeout: 30000,
-      pasvTimeout: 30000,
-      keepalive: 30000,
-    };
-
-    console.log("FTP 설정:", {
-      host: ftpConfig.host,
-      port: ftpConfig.port,
-      user: ftpConfig.user,
-    });
-
-    // FTP 업로드 실행
-    const uploadResult = await uploadToFTPServer(
-      localFilePath,
-      remotePath,
-      ftpConfig
+    // SFTP 설정
+    const sftpConfig = SftpUtils.createConfig(
+      process.env.SFTP_HOST || "localhost",
+      process.env.SFTP_USERNAME || "anonymous",
+      process.env.SFTP_PASSWORD || "",
+      parseInt(process.env.SFTP_PORT) || 22
     );
 
-    console.log("FTP 업로드 성공:", uploadResult);
+    console.log("SFTP 설정:", {
+      host: sftpConfig.host,
+      port: sftpConfig.port,
+      username: sftpConfig.username,
+    });
+
+    // SFTP 업로드 실행
+    const uploadResult = await uploadToSFTPServer(
+      localFilePath,
+      remotePath,
+      sftpConfig
+    );
+
+    console.log("SFTP 업로드 성공:", uploadResult);
 
     // 웹 접근 URL 생성
     const webAccessUrl = process.env.WEB_ACCESS_URL;
@@ -492,102 +546,96 @@ fastify.post("/api/upload-to-server", async (request, reply) => {
 
     return reply.send({
       success: true,
-      message: "파일이 성공적으로 FTP 서버에 업로드되었습니다.",
+      message: "파일이 성공적으로 SFTP 서버에 업로드되었습니다.",
       remotePath: uploadResult.remotePath,
       fileSize: uploadResult.fileSize,
       downloadUrl: downloadUrl,
       filename: filename,
     });
   } catch (error) {
-    console.error("FTP 업로드 오류:", error);
+    console.error("SFTP 업로드 오류:", error);
     console.error("오류 스택:", error.stack);
     return reply.status(500).send({
-      error: "FTP 서버 업로드 중 오류가 발생했습니다.",
+      error: "SFTP 서버 업로드 중 오류가 발생했습니다.",
       details: error.message,
     });
   }
 });
 
-// FTP 서버 폴더 조회
+// SFTP 서버 폴더 조회
 fastify.get("/api/browse-server/:sessionId", async (request, reply) => {
   try {
-    // FTP 설정
-    const ftpConfig = {
-      host: process.env.FTP_HOST || "localhost",
-      port: parseInt(process.env.FTP_PORT) || 21,
-      user: process.env.FTP_USERNAME || "anonymous",
-      password: process.env.FTP_PASSWORD || "",
-      connTimeout: 30000,
-      pasvTimeout: 30000,
-      keepalive: 30000,
-    };
+    // SFTP 설정
+    const sftpConfig = SftpUtils.createConfig(
+      process.env.SFTP_HOST || "localhost",
+      process.env.SFTP_USERNAME || "anonymous",
+      process.env.SFTP_PASSWORD || "",
+      parseInt(process.env.SFTP_PORT) || 22
+    );
 
-    // 조회할 경로
-    const browsePath = process.env.FTP_BASE_PATH;
+    // 조회할 경로 (쿼리 파라미터에서 받거나 기본 경로 사용)
+    const browsePath = request.query.path || process.env.SFTP_BASE_PATH;
 
-    // FTP 폴더 조회 실행
-    const fileList = await browseFTPDirectory(browsePath, ftpConfig);
+    // SFTP 폴더 조회 실행
+    const fileList = await browseSFTPDirectory(browsePath, sftpConfig);
 
     return reply.send({
       success: true,
       path: browsePath,
       files: fileList,
-      message: "FTP 서버 폴더 조회가 완료되었습니다.",
+      message: "SFTP 서버 폴더 조회가 완료되었습니다.",
     });
   } catch (error) {
-    console.error("FTP 폴더 조회 오류:", error);
+    console.error("SFTP 폴더 조회 오류:", error);
     return reply.status(500).send({
-      error: "FTP 서버 폴더 조회 중 오류가 발생했습니다.",
+      error: "SFTP 서버 폴더 조회 중 오류가 발생했습니다.",
       details: error.message,
     });
   }
 });
 
-// FTP 연결 테스트
+// SFTP 연결 테스트
 fastify.get("/api/test-ftp-connection", async (request, reply) => {
-  console.log("FTP 연결 테스트 요청 받음");
+  console.log("SFTP 연결 테스트 요청 받음");
 
   try {
-    // FTP 설정
-    const ftpConfig = {
-      host: process.env.FTP_HOST || "localhost",
-      port: parseInt(process.env.FTP_PORT) || 21,
-      user: process.env.FTP_USERNAME || "anonymous",
-      password: process.env.FTP_PASSWORD || "",
-      connTimeout: 10000,
-      pasvTimeout: 10000,
-      keepalive: 10000,
-    };
+    // SFTP 설정
+    const sftpConfig = SftpUtils.createConfig(
+      process.env.SFTP_HOST || "localhost",
+      process.env.SFTP_USERNAME || "anonymous",
+      process.env.SFTP_PASSWORD || "",
+      parseInt(process.env.SFTP_PORT) || 22
+    );
 
-    console.log("FTP 연결 테스트 설정:", {
-      host: ftpConfig.host,
-      port: ftpConfig.port,
-      user: ftpConfig.user,
+    console.log("SFTP 연결 테스트 설정:", {
+      host: sftpConfig.host,
+      port: sftpConfig.port,
+      username: sftpConfig.username,
     });
 
-    // FTP 연결 테스트 실행
-    const testResult = await testFTPConnection(ftpConfig);
+    // SFTP 연결 테스트 실행
+    const testResult = await testSFTPConnection(sftpConfig);
 
     return reply.send({
       success: true,
-      message: "FTP 서버 연결이 성공했습니다.",
+      message: "SFTP 서버 연결이 성공했습니다.",
       details: testResult,
     });
   } catch (error) {
-    console.error("FTP 연결 테스트 오류:", error);
+    console.error("SFTP 연결 테스트 오류:", error);
     return reply.status(500).send({
       success: false,
-      error: "FTP 서버 연결에 실패했습니다.",
+      error: "SFTP 서버 연결에 실패했습니다.",
       details: error.message,
     });
   }
 });
 
-// FTP 서버 파일 존재 확인
+// SFTP 서버 파일 존재 확인
 fastify.post("/api/check-server-file", async (request, reply) => {
   const { sessionId, filename } = request.body;
 
-  console.log("FTP 파일 존재 확인 요청:", { sessionId, filename });
+  console.log("SFTP 파일 존재 확인 요청:", { sessionId, filename });
 
   try {
     const session = sessions.get(sessionId);
@@ -595,24 +643,21 @@ fastify.post("/api/check-server-file", async (request, reply) => {
       return reply.status(404).send({ error: "압축 파일을 찾을 수 없습니다." });
     }
 
-    const baseRemotePath = process.env.FTP_BASE_PATH || "/";
+    const baseRemotePath = process.env.SFTP_BASE_PATH || "/";
     const remotePath = `${baseRemotePath}${
       baseRemotePath.endsWith("/") ? "" : "/"
     }${filename}`.replace(/\/+/g, "/");
 
-    // FTP 설정
-    const ftpConfig = {
-      host: process.env.FTP_HOST || "localhost",
-      port: parseInt(process.env.FTP_PORT) || 21,
-      user: process.env.FTP_USERNAME || "anonymous",
-      password: process.env.FTP_PASSWORD || "",
-      connTimeout: 30000,
-      pasvTimeout: 30000,
-      keepalive: 30000,
-    };
+    // SFTP 설정
+    const sftpConfig = SftpUtils.createConfig(
+      process.env.SFTP_HOST || "localhost",
+      process.env.SFTP_USERNAME || "anonymous",
+      process.env.SFTP_PASSWORD || "",
+      parseInt(process.env.SFTP_PORT) || 22
+    );
 
-    // FTP 서버에서 파일 존재 확인
-    const fileExists = await checkFTPFileExists(remotePath, ftpConfig);
+    // SFTP 서버에서 파일 존재 확인
+    const fileExists = await checkSFTPFileExists(remotePath, sftpConfig);
 
     return reply.send({
       success: true,
@@ -621,235 +666,115 @@ fastify.post("/api/check-server-file", async (request, reply) => {
       remotePath: remotePath,
     });
   } catch (error) {
-    console.error("FTP 파일 존재 확인 오류:", error);
+    console.error("SFTP 파일 존재 확인 오류:", error);
     return reply.status(500).send({
-      error: "FTP 서버 파일 확인 중 오류가 발생했습니다.",
+      error: "SFTP 서버 파일 확인 중 오류가 발생했습니다.",
       details: error.message,
     });
   }
 });
 
-// FTP 폴더 조회 함수
-function browseFTPDirectory(remotePath, ftpConfig) {
-  return new Promise((resolve, reject) => {
-    const client = new FTP();
+// SFTP 폴더 조회 함수
+async function browseSFTPDirectory(remotePath, sftpConfig) {
+  return SftpUtils.executeWithClient(sftpConfig, async (sftp) => {
+    console.log("SFTP 연결 성공 (조회)");
+    
+    const list = await sftp.list(remotePath);
+    
+    // 파일 목록 정리
+    const fileList = list
+      .filter(item => !['.',  '..'].includes(item.name))
+      .map((item) => ({
+        name: item.name,
+        type: item.type === "d" ? "directory" : "file",
+        size: item.size || 0,
+        date: item.modifyTime ? new Date(item.modifyTime) : new Date(),
+        permissions: item.rights
+          ? (item.rights.user + item.rights.group + item.rights.other)
+          : (item.type === 'd' ? 'drwxr-xr-x' : '-rw-r--r--'),
+      }));
 
-    client.on("ready", () => {
-      console.log("FTP 연결 성공 (조회)");
+    console.log(
+      `SFTP 폴더 조회 완료: ${remotePath} (${fileList.length}개 항목)`
+    );
+    return fileList;
+  });
+}
 
-      // 디렉토리 목록 조회
-      client.list(remotePath, (err, list) => {
-        client.end();
-
-        if (err) {
-          return reject(err);
-        }
-
-        // 파일 목록 정리
-        const fileList = list.map((item) => ({
-          name: item.name,
-          type: item.type === "d" ? "directory" : "file",
-          size: item.size,
-          date: item.date,
-          permissions: item.rights
-            ? item.rights.user + item.rights.group + item.rights.other
-            : "",
-        }));
-
+// SFTP 파일 존재 확인 함수
+async function checkSFTPFileExists(remotePath, sftpConfig) {
+  try {
+    return await SftpUtils.executeWithClient(sftpConfig, async (sftp) => {
+      console.log("SFTP 연결 성공 (파일 확인)");
+      
+      try {
+        const stats = await sftp.stat(remotePath);
         console.log(
-          `FTP 폴더 조회 완료: ${remotePath} (${fileList.length}개 항목)`
+          `SFTP 파일 존재 확인: ${remotePath} - 있음 (${stats.size} bytes)`
         );
-        resolve(fileList);
-      });
+        return true;
+      } catch (err) {
+        // 파일이 없거나 접근할 수 없는 경우
+        console.log(`SFTP 파일 존재 확인: ${remotePath} - 없음`);
+        return false;
+      }
     });
+  } catch (error) {
+    console.error("SFTP 연결 오류 (파일 확인):", error);
+    // 연결 오류 시에도 파일이 없는 것으로 간주
+    return false;
+  }
+}
 
-    client.on("error", (err) => {
-      console.error("FTP 연결 오류 (조회):", err);
-      reject(err);
-    });
-
-    // FTP 서버 연결
-    client.connect(ftpConfig);
+// SFTP 업로드 함수
+async function uploadToSFTPServer(localFilePath, remotePath, sftpConfig) {
+  return SftpUtils.executeWithClient(sftpConfig, async (sftp) => {
+    console.log("SFTP 연결 성공 (업로드)");
+    
+    // 로컬 파일 존재 확인
+    if (!fs.existsSync(localFilePath)) {
+      throw new Error(`로컬 파일을 찾을 수 없습니다: ${localFilePath}`);
+    }
+    
+    console.log(`파일 업로드 시작: ${localFilePath} -> ${remotePath}`);
+    
+    // 파일 업로드
+    await sftp.put(localFilePath, remotePath);
+    
+    const fileStats = fs.statSync(localFilePath);
+    
+    console.log(
+      `파일 업로드 완료: ${remotePath} (${fileStats.size} bytes)`
+    );
+    
+    return {
+      remotePath: remotePath,
+      fileSize: fileStats.size,
+    };
   });
 }
 
-// FTP 파일 존재 확인 함수
-function checkFTPFileExists(remotePath, ftpConfig) {
-  return new Promise((resolve, reject) => {
-    const client = new FTP();
-    let connectionTimedOut = false;
-
-    // 연결 타임아웃 설정 (10초)
-    const timeout = setTimeout(() => {
-      connectionTimedOut = true;
-      client.destroy();
-      reject(new Error("FTP 연결 시간 초과 (파일 확인)"));
-    }, 10000);
-
-    client.on("ready", () => {
-      clearTimeout(timeout);
-      console.log("FTP 연결 성공 (파일 확인)");
-
-      // 파일 크기 확인으로 존재 여부 판단
-      client.size(remotePath, (err, size) => {
-        client.end();
-
-        if (err) {
-          // 파일이 없거나 접근할 수 없는 경우
-          console.log(`FTP 파일 존재 확인: ${remotePath} - 없음`);
-          resolve(false);
-        } else {
-          // 파일이 존재하는 경우
-          console.log(
-            `FTP 파일 존재 확인: ${remotePath} - 있음 (${size} bytes)`
-          );
-          resolve(true);
-        }
-      });
-    });
-
-    client.on("error", (err) => {
-      clearTimeout(timeout);
-      if (!connectionTimedOut) {
-        console.error("FTP 연결 오류 (파일 확인):", err);
-        // 연결 오류 시에도 파일이 없는 것으로 간주
-        resolve(false);
-      }
-    });
-
-    console.log("FTP 서버 연결 시도 (파일 확인):", ftpConfig);
-    client.connect(ftpConfig);
-  });
-}
-
-// FTP 업로드 함수
-function uploadToFTPServer(localFilePath, remotePath, ftpConfig) {
-  return new Promise((resolve, reject) => {
-    const client = new FTP();
-    let connectionTimedOut = false;
-
-    // 연결 타임아웃 설정 (30초)
-    const timeout = setTimeout(() => {
-      connectionTimedOut = true;
-      client.destroy();
-      reject(new Error("FTP 연결 시간 초과"));
-    }, 30000);
-
-    client.on("ready", () => {
-      clearTimeout(timeout);
-      console.log("FTP 연결 성공 (업로드)");
-
-      // passive 모드 설정
-      client.ascii((err) => {
-        if (err) console.log("ASCII 모드 설정 오류:", err);
-      });
-
-      // 로컬 파일 존재 확인
-      if (!fs.existsSync(localFilePath)) {
-        client.end();
-        return reject(
-          new Error(`로컬 파일을 찾을 수 없습니다: ${localFilePath}`)
-        );
-      }
-
-      console.log(`파일 업로드 시작: ${localFilePath} -> ${remotePath}`);
-
-      // 파일 업로드
-      client.put(localFilePath, remotePath, (err) => {
-        if (err) {
-          console.error("FTP 업로드 실패:", err);
-          client.end();
-          return reject(new Error(`FTP 업로드 실패: ${err.message}`));
-        }
-
-        const fileStats = fs.statSync(localFilePath);
-
-        console.log(
-          `파일 업로드 완료: ${remotePath} (${fileStats.size} bytes)`
-        );
-        client.end();
-
-        resolve({
-          remotePath: remotePath,
-          fileSize: fileStats.size,
-        });
-      });
-    });
-
-    client.on("error", (err) => {
-      clearTimeout(timeout);
-      if (!connectionTimedOut) {
-        console.error("FTP 연결 오류 (업로드):", err);
-        reject(new Error(`FTP 연결 오류: ${err.message}`));
-      }
-    });
-
-    client.on("close", (hadError) => {
-      console.log(
-        "FTP 연결 종료 (업로드):",
-        hadError ? "오류로 인한 종료" : "정상 종료"
-      );
-    });
-
-    console.log("FTP 서버 연결 시도 (업로드):", ftpConfig);
-    // FTP 서버 연결
-    client.connect(ftpConfig);
-  });
-}
-
-// FTP 연결 테스트 함수
-function testFTPConnection(ftpConfig) {
-  return new Promise((resolve, reject) => {
-    const client = new FTP();
-    let connectionTimedOut = false;
-
-    // 연결 타임아웃 설정 (10초)
-    const timeout = setTimeout(() => {
-      connectionTimedOut = true;
-      client.destroy();
-      reject(new Error("FTP 연결 시간 초과"));
-    }, 10000);
-
-    client.on("ready", () => {
-      clearTimeout(timeout);
-      console.log("FTP 연결 성공 (테스트)");
-
-      // 간단한 pwd 명령으로 연결 확인
-      client.pwd((err, dir) => {
-        client.end();
-
-        if (err) {
-          console.log("PWD 명령 오류:", err);
-          resolve({
-            connected: true,
-            message: "연결은 성공했지만 디렉토리 정보를 가져올 수 없습니다.",
-            currentDir: "알 수 없음",
-          });
-        } else {
-          console.log("현재 디렉토리:", dir);
-          resolve({
-            connected: true,
-            message: "FTP 서버 연결이 성공했습니다.",
-            currentDir: dir,
-          });
-        }
-      });
-    });
-
-    client.on("error", (err) => {
-      clearTimeout(timeout);
-      if (!connectionTimedOut) {
-        console.error("FTP 연결 오류 (테스트):", err);
-        reject(new Error(`FTP 연결 오류: ${err.message}`));
-      }
-    });
-
-    client.on("greeting", (msg) => {
-      console.log("FTP 서버 인사말 (테스트):", msg);
-    });
-
-    console.log("FTP 서버 연결 시도 (테스트):", ftpConfig);
-    client.connect(ftpConfig);
+// SFTP 연결 테스트 함수
+async function testSFTPConnection(sftpConfig) {
+  return SftpUtils.executeWithClient(sftpConfig, async (sftp) => {
+    console.log("SFTP 연결 성공 (테스트)");
+    
+    try {
+      const dir = await sftp.pwd();
+      console.log("현재 디렉토리:", dir);
+      return {
+        connected: true,
+        message: "SFTP 서버 연결이 성공했습니다.",
+        currentDir: dir,
+      };
+    } catch (err) {
+      console.warn("PWD 명령 오류, 기본 경로 사용:", err.message);
+      return {
+        connected: true,
+        message: "SFTP 서버 연결이 성공했습니다.",
+        currentDir: "/",
+      };
+    }
   });
 }
 
