@@ -1335,11 +1335,30 @@ class ZipPdfManager {
     }
 
     try {
-      const encodedFilename = encodeURIComponent(remoteFilename);
+      // 먼저 서버에서 파일 존재 여부 확인
+      const checkResponse = await fetch("/api/check-direct-server-file", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filename: remoteFilename }),
+      });
+
+      if (checkResponse.ok) {
+        const checkResult = await checkResponse.json();
+        if (checkResult.exists) {
+          const overwrite = confirm(
+            `서버에 '${remoteFilename}' 파일이 이미 존재합니다.\n덮어쓰시겠습니까?`
+          );
+          if (!overwrite) {
+            return;
+          }
+        }
+      }
 
       // 파일을 직접 SFTP 서버에 업로드
       const formData = new FormData();
-      formData.append("filename", encodedFilename);
+      formData.append("filename", remoteFilename);
       formData.append("uploadFile", fileInput.files[0]);
 
       this.showProgress("uploadProgress", "파일 업로드 중...", true);
