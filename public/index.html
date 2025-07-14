@@ -16,9 +16,8 @@
       <main>
         <!-- 단계 1: ZIP 파일 다운로드 -->
         <section id="step1" class="step active">
-          <h2>ZIP 파일 다운로드</h2>
           <div class="input-group">
-            <label for="zipUrl">ZIP 파일 URL</label>
+            <label for="zipUrl">다운로드 URL</label>
             <input
               type="url"
               id="zipUrl"
@@ -28,9 +27,18 @@
             <button id="downloadBtn" class="btn primary">
               다운로드 & 압축 해제
             </button>
-            <button id="testFtpBtn" class="btn secondary">
-              FTP 연결 테스트
-            </button>
+          </div>
+
+          <!-- 압축 건너뛰기 옵션 -->
+          <div id="skipToUpload">
+            <div class="divider">
+              <span>서버 파일을 조회 / 직접 업로드</span>
+            </div>
+            <div class="skip-buttons">
+              <button id="skipToUploadBtn" class="btn outline">
+                서버 파일 조회
+              </button>
+            </div>
           </div>
 
           <div id="downloadProgress" class="progress-container hidden">
@@ -118,6 +126,71 @@
           </div>
         </section>
 
+        <!-- 직접 업로드 섹션 -->
+        <section id="directUpload" class="step hidden">
+          <h2>직접 파일 업로드</h2>
+          <p>ZIP 압축 없이 파일을 직접 SFTP 서버에 업로드합니다</p>
+
+          <!-- 파일 선택 -->
+          <div class="input-group">
+            <label for="directFile">업로드할 파일 선택</label>
+            <div class="file-upload-area" id="directFileUploadArea">
+              <div class="upload-icon">+</div>
+              <p>
+                파일을 드래그하여 놓거나
+                <span class="upload-link">파일 선택</span>
+              </p>
+              <input
+                type="file"
+                id="directFile"
+                accept=".zip,.rar,.7z,.tar,.gz"
+                hidden
+              />
+            </div>
+          </div>
+
+          <!-- 서버 파일명 설정 -->
+          <div class="input-group">
+            <label for="directRemoteFilename">서버 파일명</label>
+            <input
+              type="text"
+              id="directRemoteFilename"
+              placeholder="업로드할 파일명을 입력하세요"
+              required
+            />
+          </div>
+
+          <button id="directUploadBtn" class="btn primary">
+            SFTP 서버에 업로드
+          </button>
+
+          <div id="directUploadProgress" class="progress-container hidden">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text">업로드 중...</div>
+          </div>
+
+          <div id="directUploadResult" class="result-container hidden">
+            <div class="success-message">
+              <h3>업로드 완료!</h3>
+              <p id="directUploadMessage"></p>
+              <a
+                id="directDownloadLink"
+                href="#"
+                target="_blank"
+                class="btn success"
+              >
+                다운로드 링크
+              </a>
+            </div>
+          </div>
+
+          <button id="backToMainBtn" class="btn secondary">
+            메인으로 돌아가기
+          </button>
+        </section>
+
         <!-- 단계 5: FTP 서버 업로드 -->
         <section id="step5" class="step hidden">
           <h2>FTP 서버 업로드</h2>
@@ -128,17 +201,48 @@
             <div id="serverFiles"></div>
           </div>
 
-          <!-- 업로드 설정 -->
-          <div class="input-group">
-            <label for="remoteFilename">서버 파일명 (선택사항)</label>
-            <input
-              type="text"
-              id="remoteFilename"
-              placeholder="기본값: 압축 파일명 사용"
-            />
+          <!-- 재압축된 파일 업로드 섹션 -->
+          <div class="compressed-file-upload-section">
+            <div class="input-group">
+              <label for="compressedRemoteFilename">업로드 파일명</label>
+              <input
+                type="text"
+                id="compressedRemoteFilename"
+                placeholder="업로드할 파일명을 입력하세요"
+                required
+              />
+            </div>
+            <button id="compressedUploadBtn" class="btn primary">
+              재압축된 파일 업로드
+            </button>
           </div>
 
-          <button id="uploadBtn" class="btn primary">서버에 업로드</button>
+          <!-- 새 파일 업로드 섹션 (서버 파일 조회 버튼을 누르면 표시) -->
+          <div class="server-upload-section hidden">
+            <div class="input-group">
+              <label for="serverFile">업로드 파일 선택</label>
+              <div class="file-upload-area" id="serverFileUploadArea">
+                <div class="upload-icon">+</div>
+                <p>
+                  파일을 드래그하여 놓거나
+                  <span class="upload-link">파일 선택</span>
+                </p>
+                <input type="file" id="serverFile" accept="*" hidden />
+              </div>
+            </div>
+            <div class="input-group">
+              <label for="serverRemoteFilename">업로드 파일명</label>
+              <input
+                type="text"
+                id="serverRemoteFilename"
+                placeholder="업로드할 파일명을 입력하세요"
+                required
+              />
+            </div>
+            <button id="serverUploadBtn" class="btn primary">
+              파일 업로드
+            </button>
+          </div>
 
           <div id="uploadProgress" class="progress-container hidden">
             <div class="progress-bar">
