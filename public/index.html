@@ -142,20 +142,16 @@
 
           <!-- 파일 선택 -->
           <div class="input-group">
-            <label for="directFile">업로드할 파일 선택 (여러 파일 선택 가능)</label>
+            <label for="directFile"
+              >업로드할 파일 선택 (여러 파일 선택 가능)</label
+            >
             <div class="file-upload-area" id="directFileUploadArea">
               <div class="upload-icon">+</div>
               <p>
                 파일(들)을 드래그하여 놓거나
                 <span class="upload-link">파일 선택</span>
               </p>
-              <input
-                type="file"
-                id="directFile"
-                accept="*"
-                multiple
-                hidden
-              />
+              <input type="file" id="directFile" accept="*" multiple hidden />
             </div>
           </div>
 
@@ -240,7 +236,7 @@
                   파일을 드래그하여 놓거나
                   <span class="upload-link">파일 선택</span>
                 </p>
-                <input type="file" id="serverFile" accept="*" hidden />
+                <input type="file" id="serverFile" accept="*" multiple hidden />
               </div>
             </div>
             <div class="input-group">

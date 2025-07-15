@@ -33,7 +33,6 @@ class ZipPdfManager {
     // 서버 파일 업로드 영역 설정
     this.setupServerFileUpload();
 
-
     document.getElementById("directUploadBtn").addEventListener("click", () => {
       this.directUpload();
     });
@@ -45,6 +44,7 @@ class ZipPdfManager {
     // 뒤로 가기 버튼들
     document.getElementById("backToStep1").addEventListener("click", () => {
       this.showStep(1);
+      this.backToMainFromServer();
     });
 
     document.getElementById("backToStep2").addEventListener("click", () => {
@@ -56,7 +56,7 @@ class ZipPdfManager {
     });
 
     document.getElementById("backToStep4").addEventListener("click", () => {
-      this.showStep(4);
+      this.backToMainFromServer();
     });
 
     // 재압축된 파일 업로드 관련
@@ -74,7 +74,6 @@ class ZipPdfManager {
     document.getElementById("serverUploadBtn").addEventListener("click", () => {
       this.serverFileUpload();
     });
-
 
     // 3단계: 파일 업로드
     this.setupFileUpload();
@@ -103,9 +102,13 @@ class ZipPdfManager {
         this.setDefaultRemoteFilename();
         this.showStep(5);
         // 재압축된 파일 업로드 섹션 보이기
-        document.querySelector('.compressed-file-upload-section').classList.remove('hidden');
+        document
+          .querySelector(".compressed-file-upload-section")
+          .classList.remove("hidden");
         // 서버 파일 업로드 섹션 숨기기
-        document.querySelector('.server-upload-section').classList.add('hidden');
+        document
+          .querySelector(".server-upload-section")
+          .classList.add("hidden");
         // 페이지 진입 시 자동으로 서버 폴더 조회
         setTimeout(() => {
           this.browseServerFolder();
@@ -199,7 +202,7 @@ class ZipPdfManager {
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         directFileInput.files = files;
-        this.handleDirectFileSelect({ target: { files: [files[0]] } });
+        this.handleDirectFileSelect({ target: { files: files } });
       }
     });
   }
@@ -234,7 +237,7 @@ class ZipPdfManager {
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         serverFileInput.files = files;
-        this.handleServerFileSelect({ target: { files: [files[0]] } });
+        this.handleServerFileSelect({ target: { files: files } });
       }
     });
   }
@@ -1190,9 +1193,11 @@ class ZipPdfManager {
     this.currentStep = 5;
     this.showStep(5);
     // 재압축된 파일 업로드 섹션 숨기기
-    document.querySelector('.compressed-file-upload-section').classList.add('hidden');
+    document
+      .querySelector(".compressed-file-upload-section")
+      .classList.add("hidden");
     // 서버 파일 업로드 섹션 보이기
-    document.querySelector('.server-upload-section').classList.remove('hidden');
+    document.querySelector(".server-upload-section").classList.remove("hidden");
     // 서버 폴더 조회 실행
     setTimeout(() => {
       this.browseServerFolder();
@@ -1206,10 +1211,17 @@ class ZipPdfManager {
 
   // 직접 파일 선택 처리
   handleDirectFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-      const filename = file.name;
-      document.getElementById("directRemoteFilename").value = filename;
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      if (files.length === 1) {
+        // 단일 파일인 경우 파일명 자동 설정
+        document.getElementById("directRemoteFilename").value = files[0].name;
+      } else {
+        // 여러 파일인 경우 기본 ZIP 파일명 설정
+        document.getElementById(
+          "directRemoteFilename"
+        ).value = `archive_${Date.now()}.zip`;
+      }
     }
   }
 
@@ -1220,7 +1232,7 @@ class ZipPdfManager {
       .getElementById("directRemoteFilename")
       .value.trim();
 
-    if (!fileInput.files[0]) {
+    if (!fileInput.files || fileInput.files.length === 0) {
       alert("업로드할 파일을 선택해주세요.");
       return;
     }
@@ -1231,65 +1243,162 @@ class ZipPdfManager {
     }
 
     try {
-      // 임시 세션 생성
-      const tempSessionId = "direct-" + Date.now();
+      const files = Array.from(fileInput.files);
 
-      // 파일을 멀티파트로 서버에 업로드
+      // 파일이 2개 이상인 경우 ZIP 압축 확인
+      if (files.length > 1) {
+        const shouldCompress = confirm(
+          `${files.length}개의 파일이 선택되었습니다.\nZIP 파일로 압축하여 업로드하시겠습니까?`
+        );
+
+        if (!shouldCompress) {
+          return;
+        }
+
+        // 여러 파일을 ZIP으로 압축하여 업로드
+        await this.uploadMultipleFilesAsZip(files, remoteFilename);
+      } else {
+        // 단일 파일 직접 업로드
+        await this.uploadSingleFileDirect(files[0], remoteFilename);
+      }
+    } catch (error) {
+      console.error("직접 업로드 오류:", error);
+      this.hideProgress("directUploadProgress");
+      this.showError("파일 업로드 중 오류가 발생했습니다: " + error.message);
+    }
+  }
+
+  // 단일 파일 직접 업로드
+  async uploadSingleFileDirect(file, remoteFilename) {
+    // 먼저 서버에서 파일 존재 여부 확인
+    const checkResponse = await fetch("/api/check-direct-server-file", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ filename: remoteFilename }),
+    });
+
+    if (checkResponse.ok) {
+      const checkResult = await checkResponse.json();
+      if (checkResult.exists) {
+        const overwrite = confirm(
+          `서버에 '${remoteFilename}' 파일이 이미 존재합니다.\n덮어쓰시겠습니까?`
+        );
+        if (!overwrite) {
+          return;
+        }
+      }
+    }
+
+    // 파일을 직접 SFTP 서버에 업로드
+    const formData = new FormData();
+    formData.append("filename", remoteFilename);
+    formData.append("uploadFile", file);
+
+    this.showProgress("directUploadProgress", "파일 업로드 중...", true);
+
+    // 직접 SFTP 서버로 업로드
+    const uploadResponse = await fetch("/api/direct-upload-to-server", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`HTTP ${uploadResponse.status}: ${errorText}`);
+    }
+
+    const uploadResult = await uploadResponse.json();
+    this.hideProgress("directUploadProgress");
+
+    if (uploadResult.success) {
+      this.showDirectUploadResult(uploadResult);
+    } else {
+      throw new Error(uploadResult.error || "업로드 실패");
+    }
+  }
+
+  // 여러 파일을 ZIP으로 압축하여 업로드
+  async uploadMultipleFilesAsZip(files, zipFilename) {
+    this.showProgress("directUploadProgress", "세션 생성 중...", true);
+
+    // 서버에서 임시 세션 생성
+    const sessionResponse = await fetch("/api/create-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    if (!sessionResponse.ok) {
+      throw new Error("세션 생성 실패");
+    }
+
+    const sessionData = await sessionResponse.json();
+    const tempSessionId = sessionData.sessionId;
+
+    this.showProgress("directUploadProgress", "파일들을 처리 중...", true);
+
+    // 각 파일을 서버에 임시 저장
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       const formData = new FormData();
       formData.append("sessionId", tempSessionId);
-      formData.append("filename", remoteFilename);
+      formData.append("filename", file.name);
       formData.append("targetFolder", ""); // 루트 폴더
-      formData.append("uploadFile", fileInput.files[0]);
+      formData.append("uploadFile", file);
 
-      this.showProgress("directUploadProgress", "파일 업로드 중...", true);
-
-      // 먼저 파일을 서버에 임시 저장
       const addResponse = await fetch("/api/add-file", {
         method: "POST",
         body: formData,
       });
 
       if (!addResponse.ok) {
-        throw new Error("파일 업로드 실패");
+        throw new Error(`파일 ${file.name} 업로드 실패`);
       }
+    }
 
-      // 재압축 (실제로는 복사)
-      const recompressResponse = await fetch("/api/recompress", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: tempSessionId,
-          filename: remoteFilename,
-        }),
-      });
+    // ZIP 파일명 확장자 확인
+    let finalZipName = zipFilename;
+    if (!finalZipName.toLowerCase().endsWith(".zip")) {
+      finalZipName += ".zip";
+    }
 
-      if (!recompressResponse.ok) {
-        throw new Error("파일 처리 실패");
-      }
+    this.showProgress("directUploadProgress", "ZIP 파일로 압축 중...", true);
 
-      // SFTP 서버로 업로드
-      const uploadResponse = await fetch("/api/upload-to-server", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: tempSessionId,
-          remoteFilename: remoteFilename,
-        }),
-      });
+    // 재압축 (ZIP 생성)
+    const recompressResponse = await fetch("/api/recompress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: tempSessionId,
+        filename: finalZipName,
+      }),
+    });
 
-      const uploadResult = await uploadResponse.json();
+    if (!recompressResponse.ok) {
+      throw new Error("ZIP 압축 실패");
+    }
 
-      this.hideProgress("directUploadProgress");
+    this.showProgress("directUploadProgress", "SFTP 서버에 업로드 중...", true);
 
-      if (uploadResult.success) {
-        this.showDirectUploadResult(uploadResult);
-      } else {
-        throw new Error(uploadResult.error || "SFTP 업로드 실패");
-      }
-    } catch (error) {
-      this.hideProgress("directUploadProgress");
-      console.error("직접 업로드 오류:", error);
-      alert(`업로드 실패: ${error.message}`);
+    // SFTP 서버로 업로드
+    const uploadResponse = await fetch("/api/upload-to-server", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: tempSessionId,
+        remoteFilename: finalZipName,
+      }),
+    });
+
+    const uploadResult = await uploadResponse.json();
+    this.hideProgress("directUploadProgress");
+
+    if (uploadResult.success) {
+      this.showDirectUploadResult(uploadResult);
+    } else {
+      throw new Error(uploadResult.error || "SFTP 업로드 실패");
     }
   }
 
@@ -1318,6 +1427,13 @@ class ZipPdfManager {
     this.resetDirectUpload();
   }
 
+  // 서버에서 메인으로 돌아가기 (skipToUpload 보이기)
+  backToMainFromServer() {
+    this.showStep(1);
+    // skipToUpload 섹션 보이기
+    document.getElementById("skipToUpload").classList.remove("hidden");
+  }
+
   // 직접 업로드 폼 리셋
   resetDirectUpload() {
     document.getElementById("directFile").value = "";
@@ -1327,10 +1443,17 @@ class ZipPdfManager {
 
   // 서버 파일 선택 처리
   handleServerFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-      const filename = file.name;
-      document.getElementById("serverRemoteFilename").value = filename;
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      if (files.length === 1) {
+        // 단일 파일인 경우 파일명 자동 설정
+        document.getElementById("serverRemoteFilename").value = files[0].name;
+      } else {
+        // 여러 파일인 경우 기본 ZIP 파일명 설정
+        document.getElementById(
+          "serverRemoteFilename"
+        ).value = `archive_${Date.now()}.zip`;
+      }
     }
   }
 
@@ -1341,7 +1464,7 @@ class ZipPdfManager {
       .getElementById("serverRemoteFilename")
       .value.trim();
 
-    if (!fileInput.files[0]) {
+    if (!fileInput.files || fileInput.files.length === 0) {
       alert("업로드할 파일을 선택해주세요.");
       return;
     }
@@ -1352,93 +1475,86 @@ class ZipPdfManager {
     }
 
     try {
-      // 먼저 서버에서 파일 존재 여부 확인
-      const checkResponse = await fetch("/api/check-direct-server-file", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ filename: remoteFilename }),
-      });
+      const files = Array.from(fileInput.files);
 
-      if (checkResponse.ok) {
-        const checkResult = await checkResponse.json();
-        if (checkResult.exists) {
-          const overwrite = confirm(
-            `서버에 '${remoteFilename}' 파일이 이미 존재합니다.\n덮어쓰시겠습니까?`
-          );
-          if (!overwrite) {
-            return;
-          }
-        }
-      }
-
-      // 파일을 직접 SFTP 서버에 업로드
-      const formData = new FormData();
-      formData.append("filename", remoteFilename);
-      formData.append("uploadFile", fileInput.files[0]);
-
-      this.showProgress("uploadProgress", "파일 업로드 중...", true);
-
-      // 직접 SFTP 서버로 업로드
-      const uploadResponse = await fetch("/api/direct-upload-to-server", {
-        method: "POST",
-        body: formData,
-      });
-
-      console.log(
-        "응답 상태:",
-        uploadResponse.status,
-        uploadResponse.statusText
-      );
-
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error("HTTP 오류:", uploadResponse.status, errorText);
-        throw new Error(`HTTP ${uploadResponse.status}: ${errorText}`);
-      }
-
-      const uploadResult = await uploadResponse.json();
-
-      this.hideProgress("uploadProgress");
-
-      console.log("서버 응답:", uploadResult);
-
-      if (uploadResult.success) {
-        this.showUploadResult(uploadResult);
-        // 파일 목록 새로고침
-        setTimeout(() => {
-          this.browseServerFolder();
-        }, 1000);
-        // 폼 리셋
-        document.getElementById("serverFile").value = "";
-        document.getElementById("serverRemoteFilename").value = "";
-      } else {
-        console.error("서버 응답 오류:", uploadResult);
-        throw new Error(
-          `${uploadResult.error}${
-            uploadResult.details ? ": " + uploadResult.details : ""
-          }`
+      // 파일이 2개 이상인 경우 ZIP 압축 확인
+      if (files.length > 1) {
+        const shouldCompress = confirm(
+          `${files.length}개의 파일이 선택되었습니다.\nZIP 파일로 압축하여 업로드하시겠습니까?`
         );
+
+        if (!shouldCompress) {
+          return;
+        }
+
+        // 여러 파일을 ZIP으로 압축하여 업로드
+        await this.uploadServerMultipleFilesAsZip(files, remoteFilename);
+      } else {
+        // 단일 파일 직접 업로드
+        await this.uploadServerSingleFileDirect(files[0], remoteFilename);
       }
     } catch (error) {
-      this.hideProgress("uploadProgress");
       console.error("서버 파일 업로드 오류:", error);
+      this.hideProgress("uploadProgress");
+      this.showError("파일 업로드 중 오류가 발생했습니다: " + error.message);
+    }
+  }
 
-      // 더 자세한 오류 정보 표시
-      let errorMessage = error.message;
-      if (error.response) {
-        try {
-          const errorData = await error.response.json();
-          errorMessage = `${errorData.error}${
-            errorData.details ? ": " + errorData.details : ""
-          }`;
-        } catch (e) {
-          errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
+  // 서버 단일 파일 직접 업로드
+  async uploadServerSingleFileDirect(file, remoteFilename) {
+    // 먼저 서버에서 파일 존재 여부 확인
+    const checkResponse = await fetch("/api/check-direct-server-file", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ filename: remoteFilename }),
+    });
+
+    if (checkResponse.ok) {
+      const checkResult = await checkResponse.json();
+      if (checkResult.exists) {
+        const overwrite = confirm(
+          `서버에 '${remoteFilename}' 파일이 이미 존재합니다.\n덮어쓰시겠습니까?`
+        );
+        if (!overwrite) {
+          return;
         }
       }
+    }
 
-      alert(`업로드 실패: ${errorMessage}`);
+    // 파일을 직접 SFTP 서버에 업로드
+    const formData = new FormData();
+    formData.append("filename", remoteFilename);
+    formData.append("uploadFile", file);
+
+    this.showProgress("uploadProgress", "파일 업로드 중...", true);
+
+    // 직접 SFTP 서버로 업로드
+    const uploadResponse = await fetch("/api/direct-upload-to-server", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`HTTP ${uploadResponse.status}: ${errorText}`);
+    }
+
+    const uploadResult = await uploadResponse.json();
+    this.hideProgress("uploadProgress");
+
+    if (uploadResult.success) {
+      this.showUploadResult(uploadResult);
+      // 파일 목록 새로고침
+      setTimeout(() => {
+        this.browseServerFolder();
+      }, 1000);
+      // 폼 리셋
+      document.getElementById("serverFile").value = "";
+      document.getElementById("serverRemoteFilename").value = "";
+    } else {
+      throw new Error(uploadResult.error || "업로드 실패");
     }
   }
 
@@ -1453,6 +1569,96 @@ class ZipPdfManager {
     const section = document.getElementById(sectionId);
     if (section) {
       section.classList.remove("hidden");
+    }
+  }
+
+  // 서버 여러 파일을 ZIP으로 압축하여 업로드
+  async uploadServerMultipleFilesAsZip(files, zipFilename) {
+    this.showProgress("uploadProgress", "세션 생성 중...", true);
+
+    // 서버에서 임시 세션 생성
+    const sessionResponse = await fetch("/api/create-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    if (!sessionResponse.ok) {
+      throw new Error("세션 생성 실패");
+    }
+
+    const sessionData = await sessionResponse.json();
+    const tempSessionId = sessionData.sessionId;
+
+    this.showProgress("uploadProgress", "파일들을 처리 중...", true);
+
+    // 각 파일을 서버에 임시 저장
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append("sessionId", tempSessionId);
+      formData.append("filename", file.name);
+      formData.append("targetFolder", ""); // 루트 폴더
+      formData.append("uploadFile", file);
+
+      const addResponse = await fetch("/api/add-file", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!addResponse.ok) {
+        throw new Error(`파일 ${file.name} 업로드 실패`);
+      }
+    }
+
+    // ZIP 파일명 확장자 확인
+    let finalZipName = zipFilename;
+    if (!finalZipName.toLowerCase().endsWith(".zip")) {
+      finalZipName += ".zip";
+    }
+
+    this.showProgress("uploadProgress", "ZIP 파일로 압축 중...", true);
+
+    // 재압축 (ZIP 생성)
+    const recompressResponse = await fetch("/api/recompress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: tempSessionId,
+        filename: finalZipName,
+      }),
+    });
+
+    if (!recompressResponse.ok) {
+      throw new Error("ZIP 압축 실패");
+    }
+
+    this.showProgress("uploadProgress", "SFTP 서버에 업로드 중...", true);
+
+    // SFTP 서버로 업로드
+    const uploadResponse = await fetch("/api/upload-to-server", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: tempSessionId,
+        remoteFilename: finalZipName,
+      }),
+    });
+
+    const uploadResult = await uploadResponse.json();
+    this.hideProgress("uploadProgress");
+
+    if (uploadResult.success) {
+      this.showUploadResult(uploadResult);
+      // 파일 목록 새로고침
+      setTimeout(() => {
+        this.browseServerFolder();
+      }, 1000);
+      // 폼 리셋
+      document.getElementById("serverFile").value = "";
+      document.getElementById("serverRemoteFilename").value = "";
+    } else {
+      throw new Error(uploadResult.error || "SFTP 업로드 실패");
     }
   }
 }

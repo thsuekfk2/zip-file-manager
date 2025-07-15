@@ -286,6 +286,38 @@ fastify.get("/api/progress/:sessionId", async (request, reply) => {
   return reply.send(progress);
 });
 
+// 임시 세션 생성
+fastify.post("/api/create-session", async (request, reply) => {
+  const sessionId = uuidv4();
+  
+  // 임시 디렉토리 생성
+  const tempDir = tmp.dirSync({ unsafeCleanup: true });
+  const extractDir = path.join(tempDir.name, "extracted");
+  await fs.ensureDir(extractDir);
+
+  // 세션 데이터 저장
+  sessions.set(sessionId, {
+    tempDir: tempDir.name,
+    extractDir,
+    files: [],
+    folders: [{
+      name: "(루트 폴더)",
+      path: "",
+      type: "folder",
+      modified: new Date(),
+    }],
+  });
+
+  // 10분 후 자동 정리
+  setTimeout(() => cleanupSession(sessionId), 10 * 60 * 1000);
+
+  return reply.send({
+    success: true,
+    sessionId: sessionId,
+    message: "세션이 생성되었습니다.",
+  });
+});
+
 // 파일 목록 조회
 fastify.get("/api/files/:sessionId", async (request, reply) => {
   const { sessionId } = request.params;
