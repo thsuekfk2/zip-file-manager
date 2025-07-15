@@ -100,7 +100,8 @@ header p {
 
 .input-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-top: 10px;
+  margin-bottom: 15px;
   font-weight: 500;
   color: #444;
   font-size: 14px;
@@ -159,7 +160,6 @@ header p {
 .btn.success:hover {
   background: #777;
 }
-
 
 .btn:disabled {
   opacity: 0.4;
@@ -552,8 +552,12 @@ header p {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 로딩 애니메이션 */

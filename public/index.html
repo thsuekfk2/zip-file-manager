@@ -3,41 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZIP 파일 관리 및 파일 추가 도구</title>
+    <title>응용프로그램 관리 도구</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="container">
       <header>
-        <h1>ZIP 파일 관리 및 파일 추가 도구</h1>
-        <p>ZIP 파일을 다운로드하고 파일을 추가하여 재압축하세요</p>
+        <h1>응용프로그램 관리 도구</h1>
+        <p>
+          ZIP 파일을 다운로드하고 파일을 추가/변경하여 재압축할 수 있습니다.
+        </p>
+        <p>ZIP 파일을 바로 윈도우 서버에 직접 업로드할 수 있습니다.</p>
       </header>
 
       <main>
         <!-- 단계 1: ZIP 파일 다운로드 -->
         <section id="step1" class="step active">
           <div class="input-group">
-            <label for="zipUrl">다운로드 URL</label>
+            <h3>기존 파일을 추가 / 변경</h3>
+            <label for="zipUrl">URL로 ZIP파일 다운로드</label>
             <input
               type="url"
               id="zipUrl"
               placeholder="https://example.com/file.zip"
               required
             />
-            <button id="downloadBtn" class="btn primary">
-              다운로드 & 압축 해제
-            </button>
+            <button id="downloadBtn" class="btn primary">다운로드</button>
           </div>
 
           <!-- 압축 건너뛰기 옵션 -->
           <div id="skipToUpload">
-            <div class="divider">
-              <span>서버 파일을 조회 / 직접 업로드</span>
-            </div>
-            <div class="skip-buttons">
-              <button id="skipToUploadBtn" class="btn outline">
-                서버 파일 조회
-              </button>
+            <div class="divider"><span>OR</span></div>
+            <div class="skip-group">
+              <h3>새로운 파일을 추가</h3>
+              <div class="skip-buttons">
+                <button id="skipToUploadBtn" class="btn outline">
+                  서버 파일 조회 & 직접 업로드
+                </button>
+              </div>
             </div>
           </div>
 
@@ -201,7 +204,7 @@
         <section id="step5" class="step hidden">
           <div class="step-header">
             <button id="backToStep4" class="back-btn">&lt;</button>
-            <h2>FTP 서버 업로드</h2>
+            <h2>서버 업로드</h2>
           </div>
 
           <!-- 서버 파일 목록 -->
