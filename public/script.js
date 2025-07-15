@@ -724,6 +724,9 @@ class ZipPdfManager {
       step.classList.remove("active");
     });
 
+    // 이전 단계의 상태 리셋
+    this.resetStepState(this.currentStep);
+
     // 현재 단계 표시
     const currentStep = document.getElementById(`step${stepNumber}`);
     if (currentStep) {
@@ -1543,15 +1546,36 @@ class ZipPdfManager {
 
   // 메인으로 돌아가기
   backToMain() {
+    this.resetDirectUploadState();
     this.showStep(1);
-    this.resetDirectUpload();
   }
 
   // 서버에서 메인으로 돌아가기 (skipToUpload 보이기)
   backToMainFromServer() {
+    this.resetDirectUploadState();
     this.showStep(1);
     // skipToUpload 섹션 보이기
     document.getElementById("skipToUpload").classList.remove("hidden");
+  }
+
+  // 직접 업로드 상태 리셋
+  resetDirectUploadState() {
+    // 직접 업로드 진행률 숨기기
+    this.hideProgress("directUploadProgress");
+    
+    // 직접 업로드 버튼 활성화
+    const directUploadBtn = document.getElementById("directUploadBtn");
+    this.enableUploadButton(directUploadBtn, "SFTP 서버에 업로드");
+    
+    // 직접 업로드 결과 숨기기
+    const directUploadResult = document.getElementById("directUploadResult");
+    if (directUploadResult) directUploadResult.classList.add("hidden");
+    
+    // 직접 업로드 폼 리셋
+    this.resetDirectUpload();
+    
+    // 에러/상태 메시지 숨기기
+    this.hideMessages();
   }
 
   // 직접 업로드 폼 리셋
@@ -1838,6 +1862,147 @@ class ZipPdfManager {
       button.style.cursor = "pointer";
       delete button.dataset.originalText;
     }
+  }
+
+  // 단계별 상태 리셋 함수
+  resetStepState(fromStep) {
+    if (!fromStep) return;
+
+    switch (fromStep) {
+      case 1:
+        this.resetStep1State();
+        break;
+      case 2:
+        this.resetStep2State();
+        break;
+      case 3:
+        this.resetStep3State();
+        break;
+      case 4:
+        this.resetStep4State();
+        break;
+      case 5:
+        this.resetStep5State();
+        break;
+    }
+  }
+
+  // 1단계 상태 리셋
+  resetStep1State() {
+    // 다운로드 진행률 숨기기
+    this.hideProgress("downloadProgress");
+    // 다운로드 버튼 활성화
+    const downloadBtn = document.getElementById("downloadBtn");
+    this.enableUploadButton(downloadBtn, "다운로드");
+    // 에러/상태 메시지 숨기기
+    this.hideMessages();
+  }
+
+  // 2단계 상태 리셋
+  resetStep2State() {
+    // 파일 목록 초기화는 필요 시에만
+    this.hideMessages();
+  }
+
+  // 3단계 상태 리셋
+  resetStep3State() {
+    // 파일 추가 버튼 활성화
+    const addBtn = document.getElementById("addFileBtn");
+    this.enableUploadButton(addBtn, "파일 추가");
+    
+    // 파일 업로드 영역 리셋
+    this.resetFileUploadArea();
+    
+    // 입력 필드 초기화
+    document.getElementById("filename").value = "";
+    document.getElementById("targetFolder").selectedIndex = 0;
+    
+    this.hideMessages();
+  }
+
+  // 4단계 상태 리셋
+  resetStep4State() {
+    // 재압축 진행률 숨기기
+    this.hideProgress("recompressProgress");
+    
+    // 재압축 버튼 활성화
+    const recompressBtn = document.getElementById("recompressBtn");
+    this.enableUploadButton(recompressBtn, "재압축");
+    
+    // 다운로드 결과 숨기기
+    const downloadResult = document.getElementById("downloadResult");
+    if (downloadResult) downloadResult.classList.add("hidden");
+    
+    this.hideMessages();
+  }
+
+  // 5단계 상태 리셋
+  resetStep5State() {
+    // 업로드 진행률 숨기기
+    this.hideProgress("uploadProgress");
+    
+    // 모든 업로드 버튼 활성화
+    const compressedUploadBtn = document.getElementById("compressedUploadBtn");
+    const serverUploadBtn = document.getElementById("serverUploadBtn");
+    
+    this.enableUploadButton(compressedUploadBtn, "재압축된 파일 업로드");
+    this.enableUploadButton(serverUploadBtn, "파일 업로드");
+    
+    // 업로드 결과 숨기기
+    const uploadResult = document.getElementById("uploadResult");
+    if (uploadResult) uploadResult.classList.add("hidden");
+    
+    // 서버 파일 목록 숨기기
+    const serverFileList = document.getElementById("serverFileList");
+    if (serverFileList) serverFileList.classList.add("hidden");
+    
+    // 서버 파일 업로드 영역 리셋
+    this.resetServerFileUploadArea();
+    
+    this.hideMessages();
+  }
+
+  // 파일 업로드 영역 리셋
+  resetFileUploadArea() {
+    const fileUploadArea = document.getElementById("fileUploadArea");
+    const fileInput = document.getElementById("fileInput");
+    
+    if (fileInput) fileInput.value = "";
+    this.selectedFile = null;
+    
+    if (fileUploadArea) {
+      fileUploadArea.innerHTML = `
+        <div class="upload-icon">+</div>
+        <p>
+          파일을 드래그하여 놓거나
+          <span class="upload-link">파일 선택</span>
+        </p>
+        <input type="file" id="fileInput" hidden />
+      `;
+      // 이벤트 리스너 재설정
+      this.setupFileUpload();
+    }
+  }
+
+  // 서버 파일 업로드 영역 리셋
+  resetServerFileUploadArea() {
+    const serverFileInput = document.getElementById("serverFile");
+    const serverRemoteFilename = document.getElementById("serverRemoteFilename");
+    
+    if (serverFileInput) serverFileInput.value = "";
+    if (serverRemoteFilename) serverRemoteFilename.value = "";
+    
+    this.serverFiles = null;
+    this.resetFileUploadDisplay("serverFileUploadArea");
+  }
+
+  // 에러/상태 메시지 숨기기
+  hideMessages() {
+    const statusMessage = document.getElementById("statusMessage");
+    const errorMessage = document.getElementById("errorMessage");
+    
+    if (statusMessage) statusMessage.classList.add("hidden");
+    if (errorMessage) errorMessage.classList.add("hidden");
   }
 }
 
