@@ -557,6 +557,13 @@ class ZipPdfManager {
   }
 
   async addFile() {
+    const addBtn = document.getElementById("addFileBtn");
+    
+    // 이미 업로드 중인지 확인
+    if (addBtn.disabled) {
+      return;
+    }
+
     const filename = document.getElementById("filename").value.trim();
     const targetFolder = document.getElementById("targetFolder").value;
 
@@ -564,6 +571,9 @@ class ZipPdfManager {
       this.showError("파일명, 파일, 저장 폴더를 모두 선택해주세요.");
       return;
     }
+
+    // 버튼 비활성화 및 텍스트 변경
+    this.disableUploadButton(addBtn, "파일 추가 중...");
 
     // 파일 존재 여부 확인
     try {
@@ -627,11 +637,12 @@ class ZipPdfManager {
         this.showError(data.error || "PDF 추가 중 오류가 발생했습니다.");
       }
 
-      addBtn.textContent = originalText;
-      addBtn.disabled = false;
     } catch (error) {
       console.error("PDF 추가 오류:", error);
       this.showError("서버와 통신 중 오류가 발생했습니다.");
+    } finally {
+      // 버튼 활성화
+      this.enableUploadButton(addBtn, "파일 추가");
     }
   }
 
@@ -1108,6 +1119,13 @@ class ZipPdfManager {
 
   // FTP 서버에 업로드
   async uploadToServer() {
+    const uploadBtn = document.getElementById("compressedUploadBtn");
+    
+    // 이미 업로드 중인지 확인
+    if (uploadBtn.disabled) {
+      return;
+    }
+
     if (!this.sessionId) {
       this.showError("세션 정보가 없습니다.");
       return;
@@ -1116,6 +1134,9 @@ class ZipPdfManager {
     const remoteFilename = document
       .getElementById("compressedRemoteFilename")
       .value.trim();
+
+    // 버튼 비활성화 및 텍스트 변경
+    this.disableUploadButton(uploadBtn, "업로드 중...");
 
     console.log("FTP 업로드 시작:", {
       sessionId: this.sessionId,
@@ -1201,6 +1222,9 @@ class ZipPdfManager {
       console.error("서버 업로드 오류:", error);
       this.showError(`서버와 통신 중 오류가 발생했습니다: ${error.message}`);
       this.hideProgress("uploadProgress");
+    } finally {
+      // 버튼 활성화
+      this.enableUploadButton(uploadBtn, "재압축된 파일 업로드");
     }
   }
 
@@ -1307,6 +1331,13 @@ class ZipPdfManager {
 
   // 직접 업로드 실행
   async directUpload() {
+    const uploadBtn = document.getElementById("directUploadBtn");
+    
+    // 이미 업로드 중인지 확인
+    if (uploadBtn.disabled) {
+      return;
+    }
+
     const fileInput = document.getElementById("directFile");
     const remoteFilename = document
       .getElementById("directRemoteFilename")
@@ -1324,6 +1355,9 @@ class ZipPdfManager {
       alert("서버 파일명을 입력해주세요.");
       return;
     }
+
+    // 버튼 비활성화 및 텍스트 변경
+    this.disableUploadButton(uploadBtn, "업로드 중...");
 
     try {
       const files = Array.from(selectedFiles);
@@ -1348,6 +1382,9 @@ class ZipPdfManager {
       console.error("직접 업로드 오류:", error);
       this.hideProgress("directUploadProgress");
       this.showError("파일 업로드 중 오류가 발생했습니다: " + error.message);
+    } finally {
+      // 업로드 완료 후 버튼 활성화
+      this.enableUploadButton(uploadBtn, "SFTP 서버에 업로드");
     }
   }
 
@@ -1552,6 +1589,13 @@ class ZipPdfManager {
 
   // 서버 파일 업로드
   async serverFileUpload() {
+    const uploadBtn = document.getElementById("serverUploadBtn");
+    
+    // 이미 업로드 중인지 확인
+    if (uploadBtn.disabled) {
+      return;
+    }
+
     const fileInput = document.getElementById("serverFile");
     const remoteFilename = document
       .getElementById("serverRemoteFilename")
@@ -1569,6 +1613,9 @@ class ZipPdfManager {
       alert("서버 파일명을 입력해주세요.");
       return;
     }
+
+    // 버튼 비활성화 및 텍스트 변경
+    this.disableUploadButton(uploadBtn, "업로드 중...");
 
     try {
       const files = Array.from(selectedFiles);
@@ -1593,6 +1640,9 @@ class ZipPdfManager {
       console.error("서버 파일 업로드 오류:", error);
       this.hideProgress("uploadProgress");
       this.showError("파일 업로드 중 오류가 발생했습니다: " + error.message);
+    } finally {
+      // 버튼 활성화
+      this.enableUploadButton(uploadBtn, "파일 업로드");
     }
   }
 
@@ -1765,6 +1815,28 @@ class ZipPdfManager {
       this.resetFileUploadDisplay("serverFileUploadArea");
     } else {
       throw new Error(uploadResult.error || "SFTP 업로드 실패");
+    }
+  }
+
+  // 업로드 버튼 비활성화 헬퍼 함수
+  disableUploadButton(button, loadingText) {
+    if (button) {
+      button.disabled = true;
+      button.dataset.originalText = button.textContent;
+      button.textContent = loadingText;
+      button.style.opacity = "0.6";
+      button.style.cursor = "not-allowed";
+    }
+  }
+
+  // 업로드 버튼 활성화 헬퍼 함수
+  enableUploadButton(button, originalText) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || button.dataset.originalText || button.textContent;
+      button.style.opacity = "1";
+      button.style.cursor = "pointer";
+      delete button.dataset.originalText;
     }
   }
 }
