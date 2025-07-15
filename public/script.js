@@ -1100,6 +1100,11 @@ class ZipPdfManager {
         const fileDate = new Date(file.date).toLocaleDateString();
         const fileType = file.type === "directory" ? "[폴더]" : "[파일]";
 
+        // 파일인 경우에만 삭제 버튼 표시
+        const deleteButton = file.type === "file" 
+          ? `<button class="delete-btn" onclick="zipManager.deleteServerFile('${file.name}')" title="파일 삭제">×</button>`
+          : "";
+
         return `
           <div class="file-item">
             <div class="file-name">${fileType} ${file.name}</div>
@@ -1110,6 +1115,7 @@ class ZipPdfManager {
                   : ""
               }
               <span class="file-date">${fileDate}</span>
+              ${deleteButton}
             </div>
           </div>
         `;
@@ -2004,9 +2010,59 @@ class ZipPdfManager {
     if (statusMessage) statusMessage.classList.add("hidden");
     if (errorMessage) errorMessage.classList.add("hidden");
   }
+
+  // 서버 파일 삭제
+  async deleteServerFile(filename) {
+    // 삭제 확인
+    const confirmDelete = confirm(`'${filename}' 파일을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`);
+    
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      console.log("파일 삭제 요청:", filename);
+      
+      this.showStatus("파일 삭제 중...");
+      
+      const response = await fetch("/api/delete-server-file", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          filename: filename,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        this.showStatus(result.message);
+        
+        // 파일 목록 새로고침
+        setTimeout(() => {
+          this.browseServerFolder();
+        }, 500);
+      } else {
+        throw new Error(result.error || "파일 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("파일 삭제 오류:", error);
+      this.showError(`파일 삭제 중 오류가 발생했습니다: ${error.message}`);
+    }
+  }
 }
+
+// 전역 변수 선언
+let zipManager;
 
 // 애플리케이션 초기화
 document.addEventListener("DOMContentLoaded", () => {
-  new ZipPdfManager();
+  zipManager = new ZipPdfManager();
 });

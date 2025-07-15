@@ -834,6 +834,48 @@ fastify.post("/api/check-server-file", async (request, reply) => {
   }
 });
 
+// SFTP 서버 파일 삭제
+fastify.post("/api/delete-server-file", async (request, reply) => {
+  const { filename } = request.body;
+
+  console.log("SFTP 파일 삭제 요청:", { filename });
+
+  try {
+    if (!filename) {
+      return reply.status(400).send({ error: "파일명이 누락되었습니다." });
+    }
+
+    const baseRemotePath = process.env.SFTP_BASE_PATH || "/";
+    const remotePath = `${baseRemotePath}${
+      baseRemotePath.endsWith("/") ? "" : "/"
+    }${filename}`.replace(/\/+/g, "/");
+
+    // SFTP 설정
+    const sftpConfig = SftpUtils.createConfig(
+      process.env.SFTP_HOST || "localhost",
+      process.env.SFTP_USERNAME || "anonymous",
+      process.env.SFTP_PASSWORD || "",
+      parseInt(process.env.SFTP_PORT) || 22
+    );
+
+    // SFTP 서버에서 파일 삭제
+    const deleteResult = await deleteFromSFTPServer(remotePath, sftpConfig);
+
+    return reply.send({
+      success: true,
+      message: `파일 '${filename}'이 성공적으로 삭제되었습니다.`,
+      filename: filename,
+      remotePath: remotePath,
+    });
+  } catch (error) {
+    console.error("SFTP 파일 삭제 오류:", error);
+    return reply.status(500).send({
+      error: "SFTP 서버 파일 삭제 중 오류가 발생했습니다.",
+      details: error.message,
+    });
+  }
+});
+
 // SFTP 폴더 조회 함수
 async function browseSFTPDirectory(remotePath, sftpConfig) {
   return SftpUtils.executeWithClient(sftpConfig, async (sftp) => {
@@ -935,6 +977,32 @@ async function testSFTPConnection(sftpConfig) {
         currentDir: "/",
       };
     }
+  });
+}
+
+// SFTP 파일 삭제 함수
+async function deleteFromSFTPServer(remotePath, sftpConfig) {
+  return SftpUtils.executeWithClient(sftpConfig, async (sftp) => {
+    console.log("SFTP 연결 성공 (삭제)");
+
+    // 파일 존재 확인
+    try {
+      await sftp.stat(remotePath);
+    } catch (err) {
+      throw new Error(`파일을 찾을 수 없습니다: ${remotePath}`);
+    }
+
+    console.log(`파일 삭제 시작: ${remotePath}`);
+
+    // 파일 삭제
+    await sftp.delete(remotePath);
+
+    console.log(`파일 삭제 완료: ${remotePath}`);
+
+    return {
+      remotePath: remotePath,
+      deleted: true,
+    };
   });
 }
 
