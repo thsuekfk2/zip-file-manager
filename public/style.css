@@ -55,13 +55,42 @@ header p {
   animation: fadeInUp 0.5s ease;
 }
 
+/* 단계 헤더 */
+.step-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
 .step h2 {
   font-size: 1.25rem;
   font-weight: 500;
   color: #222;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  margin: 0;
 }
 
 /* 입력 그룹 */
@@ -130,6 +159,7 @@ header p {
 .btn.success:hover {
   background: #777;
 }
+
 
 .btn:disabled {
   opacity: 0.4;

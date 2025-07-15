@@ -42,6 +42,23 @@ class ZipPdfManager {
       this.backToMain();
     });
 
+    // 뒤로 가기 버튼들
+    document.getElementById("backToStep1").addEventListener("click", () => {
+      this.showStep(1);
+    });
+
+    document.getElementById("backToStep2").addEventListener("click", () => {
+      this.showStep(2);
+    });
+
+    document.getElementById("backToStep3").addEventListener("click", () => {
+      this.showStep(3);
+    });
+
+    document.getElementById("backToStep4").addEventListener("click", () => {
+      this.showStep(4);
+    });
+
     // 재압축된 파일 업로드 관련
     document
       .getElementById("compressedUploadBtn")
