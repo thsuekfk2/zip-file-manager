@@ -463,8 +463,6 @@ class ZipPdfManager {
       return;
     }
 
-    // 파일 정보를 저장하여 나중에 시간 예측에 사용
-    this.fileListData = files;
 
     const fileItems = files
       .map((file) => {
@@ -674,8 +672,6 @@ class ZipPdfManager {
         this.showStatus(data.message);
         this.showDownloadResult(data.filename, data.size);
         this.hideProgress("recompressProgress");
-        // 압축된 파일 크기 저장 (업로드 시간 예측용)
-        this.compressedFileSize = data.size;
       } else {
         this.showError(data.error || "압축 중 오류가 발생했습니다.");
         this.hideProgress("recompressProgress");
@@ -893,67 +889,6 @@ class ZipPdfManager {
     `;
   }
 
-  // 압축 시간 예측 (파일 크기 기반)
-  estimateCompressionTime(files) {
-    if (!files || files.length === 0) {
-      return 1500; // 기본값
-    }
-
-    // 총 파일 크기 계산
-    const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
-
-    // MB 단위로 변환
-    const sizeInMB = totalSize / (1024 * 1024);
-
-    // 압축 시간 계산 (대략적인 공식)
-    // 1MB당 약 200ms, 최소 1초, 최대 10초
-    const estimatedTime = Math.max(1000, Math.min(10000, sizeInMB * 200));
-
-    console.log(
-      `압축 시간 예측: ${sizeInMB.toFixed(2)}MB -> ${estimatedTime}ms`
-    );
-    return estimatedTime;
-  }
-
-  // 업로드 시간 예측 (파일 크기 기반)
-  estimateUploadTime(fileSize) {
-    if (!fileSize) {
-      return 2000; // 기본값
-    }
-
-    // MB 단위로 변환
-    const sizeInMB = fileSize / (1024 * 1024);
-
-    // 업로드 시간 계산 (네트워크 속도 가정: 1MB/s)
-    // 1MB당 약 1000ms, 최소 1초, 최대 30초
-    const estimatedTime = Math.max(1000, Math.min(30000, sizeInMB * 1000));
-
-    console.log(
-      `업로드 시간 예측: ${sizeInMB.toFixed(2)}MB -> ${estimatedTime}ms`
-    );
-    return estimatedTime;
-  }
-
-  // 진행률 시뮬레이션
-  simulateProgress(progressId, baseMessage, duration) {
-    const progressContainer = document.getElementById(progressId);
-    const progressFill = progressContainer.querySelector(".progress-fill");
-    const progressText = progressContainer.querySelector(".progress-text");
-
-    let progress = 0;
-    const increment = 100 / (duration / 50); // 50ms 간격으로 업데이트
-
-    const interval = setInterval(() => {
-      progress += increment;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-
-      progressFill.style.width = `${progress}%`;
-      progressText.textContent = `${baseMessage}... ${Math.round(progress)}%`;
-    }, 50);
-  }
 
   // 실제 작업 진행률 폴링
   async pollOperationProgress(sessionId, progressId, onComplete) {
@@ -1313,10 +1248,6 @@ class ZipPdfManager {
     }, 100);
   }
 
-  // 압축 건너뛰기: 직접 업로드
-  skipToDirectUpload() {
-    this.showSection("directUpload");
-  }
 
   // 직접 파일 선택 처리
   handleDirectFileSelect(event) {

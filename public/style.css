@@ -457,13 +457,6 @@ header p {
   }
 }
 
-/* 압축 건너뛰기 섹션 */
-.skip-section {
-  margin-top: 40px;
-  padding-top: 32px;
-  border-top: 1px solid #e5e5e5;
-}
-
 .divider {
   text-align: center;
   margin: 30px 0;
@@ -488,19 +481,6 @@ header p {
   font-size: 0.9rem;
   position: relative;
   z-index: 2;
-}
-
-.skip-section h3 {
-  font-size: 1.25rem;
-  color: #333;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.skip-section p {
-  color: #666;
-  margin-bottom: 20px;
-  font-size: 0.95rem;
 }
 
 .skip-buttons {
@@ -560,19 +540,6 @@ header p {
   }
   100% {
     transform: rotate(360deg);
-  }
-}
-
-/* 로딩 애니메이션 */
-@keyframes loading {
-  0% {
-    width: 0%;
-  }
-  50% {
-    width: 100%;
-  }
-  100% {
-    width: 0%;
   }
 }
 
