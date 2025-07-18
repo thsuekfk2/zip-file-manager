@@ -141,19 +141,121 @@ fastify.addHook("onRequest", async (request, reply) => {
 
   if (!isAllowedIP(clientIP)) {
     console.log(`접근 거부 - IP: ${clientIP}`);
+    console.log(`요청 URL: ${request.url}`);
 
-    // API 요청인 경우 JSON 응답
-    if (request.url.startsWith("/api/")) {
-      reply.code(403).send({
-        error: "접근이 거부되었습니다.",
-        message: "허용되지 않은 네트워크에서의 접근입니다.",
-        clientIP: clientIP,
-      });
+    // 일반 페이지 요청인 경우 HTML 페이지 반환 (우선 처리)
+    if (!request.url.startsWith("/api/")) {
+      console.log("일반 페이지 요청 - HTML 페이지 반환");
+      
+      const accessDeniedHTML = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>접근 거부 - 응용프로그램 관리 도구</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #fafafa;
+            color: #333;
+            line-height: 1.5;
+            font-size: 14px;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .access-denied-card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 48px 32px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        .warning-icon {
+            font-size: 4rem;
+            color: #999;
+            margin-bottom: 24px;
+            display: block;
+        }
+        .title {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: #222;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+        .message {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        .ip-info {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #333;
+            margin-top: 12px;
+        }
+        .retry-btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            margin-top: 16px;
+        }
+        .retry-btn:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="access-denied-card">
+            <div class="warning-icon">⚠️</div>
+            <h1 class="title">접근이 거부되었습니다</h1>
+            <p class="message">
+                죄송합니다. 현재 위치에서는 이 서비스에 접근할 수 없습니다.<br>
+                허용된 네트워크에서만 접속이 가능합니다.
+            </p>
+            <div class="ip-info">현재 IP: ${clientIP}</div>
+            <button class="retry-btn" onclick="window.location.reload()">다시 시도</button>
+        </div>
+    </div>
+</body>
+</html>`;
+
+      reply.code(403).type("text/html").send(accessDeniedHTML);
       return;
     }
 
-    // 일반 페이지 요청인 경우 HTML 페이지 반환
-    reply.code(403).type("text/html").sendFile("access-denied.html");
+    // API 요청인 경우 JSON 응답
+    console.log("API 요청 - JSON 응답");
+    reply.code(403).send({
+      error: "접근이 거부되었습니다.",
+      message: "허용되지 않은 네트워크에서의 접근입니다.",
+      clientIP: clientIP,
+    });
     return;
   }
 });
