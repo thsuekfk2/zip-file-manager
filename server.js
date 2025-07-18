@@ -75,9 +75,6 @@ const isAllowedIP = (clientIP) => {
   const allowedIPs = process.env.ALLOWED_IPS
     ? process.env.ALLOWED_IPS.split(",")
     : [];
-  const allowedRanges = process.env.ALLOWED_IP_RANGES
-    ? process.env.ALLOWED_IP_RANGES.split(",")
-    : [];
 
   // 모든 IP 허용 (개발용)
   if (allowedIPs.includes("*")) {
@@ -87,13 +84,6 @@ const isAllowedIP = (clientIP) => {
   // 특정 IP 체크
   if (allowedIPs.includes(clientIP)) {
     return true;
-  }
-
-  // IP 범위 체크
-  for (const range of allowedRanges) {
-    if (range.trim() && isIPInRange(clientIP, range.trim())) {
-      return true;
-    }
   }
 
   return false;
@@ -131,6 +121,8 @@ fastify.addHook("onRequest", async (request, reply) => {
     request.socket?.remoteAddress ||
     request.raw?.connection?.remoteAddress ||
     request.raw?.socket?.remoteAddress;
+
+  console.log("clientIP", clientIP);
 
   // IPv6 형태의 localhost를 IPv4로 변환
   if (clientIP === "::1" || clientIP === "::ffff:127.0.0.1") {
