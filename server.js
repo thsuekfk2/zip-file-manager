@@ -1,6 +1,9 @@
 require("dotenv").config();
 
-const fastify = require("fastify")({ logger: true });
+const fastify = require("fastify")({
+  logger: true,
+  trustProxy: true,
+});
 const path = require("path");
 const fs = require("fs-extra");
 const axios = require("axios");
@@ -67,6 +70,102 @@ const SftpUtils = {
   },
 };
 
+// IP 주소 기반 접근 제어 미들웨어
+const isAllowedIP = (clientIP) => {
+  const allowedIPs = process.env.ALLOWED_IPS
+    ? process.env.ALLOWED_IPS.split(",")
+    : [];
+  const allowedRanges = process.env.ALLOWED_IP_RANGES
+    ? process.env.ALLOWED_IP_RANGES.split(",")
+    : [];
+
+  // 모든 IP 허용 (개발용)
+  if (allowedIPs.includes("*")) {
+    return true;
+  }
+
+  // 특정 IP 체크
+  if (allowedIPs.includes(clientIP)) {
+    return true;
+  }
+
+  // IP 범위 체크
+  for (const range of allowedRanges) {
+    if (range.trim() && isIPInRange(clientIP, range.trim())) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+// IP 범위 체크 함수
+const isIPInRange = (ip, range) => {
+  try {
+    const [networkIP, prefixLength] = range.split("/");
+    const ipNum = ipToNumber(ip);
+    const networkNum = ipToNumber(networkIP);
+    const mask = (0xffffffff << (32 - parseInt(prefixLength))) >>> 0;
+
+    return (ipNum & mask) === (networkNum & mask);
+  } catch (error) {
+    console.error("IP 범위 체크 오류:", error);
+    return false;
+  }
+};
+
+// IP 주소를 숫자로 변환
+const ipToNumber = (ip) => {
+  return (
+    ip.split(".").reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0
+  );
+};
+
+// 접근 제어 미들웨어 등록
+fastify.addHook("onRequest", async (request, reply) => {
+  let clientIP =
+    request.ip ||
+    request.headers["x-forwarded-for"] ||
+    request.headers["x-real-ip"] ||
+    request.connection?.remoteAddress ||
+    request.socket?.remoteAddress ||
+    request.raw?.connection?.remoteAddress ||
+    request.raw?.socket?.remoteAddress;
+
+  // IPv6 형태의 localhost를 IPv4로 변환
+  if (clientIP === "::1" || clientIP === "::ffff:127.0.0.1") {
+    clientIP = "127.0.0.1";
+  }
+
+  // x-forwarded-for 헤더에서 첫 번째 IP 추출 (프록시 통과 시)
+  if (clientIP && clientIP.includes(",")) {
+    clientIP = clientIP.split(",")[0].trim();
+  }
+
+  // IPv6 매핑된 IPv4 주소 처리
+  if (clientIP && clientIP.startsWith("::ffff:")) {
+    clientIP = clientIP.replace("::ffff:", "");
+  }
+
+  if (!isAllowedIP(clientIP)) {
+    console.log(`접근 거부 - IP: ${clientIP}`);
+
+    // API 요청인 경우 JSON 응답
+    if (request.url.startsWith("/api/")) {
+      reply.code(403).send({
+        error: "접근이 거부되었습니다.",
+        message: "허용되지 않은 네트워크에서의 접근입니다.",
+        clientIP: clientIP,
+      });
+      return;
+    }
+
+    // 일반 페이지 요청인 경우 HTML 페이지 반환
+    reply.code(403).type("text/html").sendFile("access-denied.html");
+    return;
+  }
+});
+
 // 플러그인 등록
 fastify.register(require("@fastify/static"), {
   root: path.join(__dirname, "public"),
@@ -97,6 +196,38 @@ const cleanupSession = (sessionId) => {
   sessions.delete(sessionId);
   downloadProgress.delete(sessionId);
 };
+
+// 클라이언트 IP 확인 API
+fastify.get("/api/client-ip", async (request, reply) => {
+  let clientIP =
+    request.ip ||
+    request.headers["x-forwarded-for"] ||
+    request.headers["x-real-ip"] ||
+    request.connection?.remoteAddress ||
+    request.socket?.remoteAddress ||
+    request.raw?.connection?.remoteAddress ||
+    request.raw?.socket?.remoteAddress;
+
+  // IPv6 형태의 localhost를 IPv4로 변환
+  if (clientIP === "::1" || clientIP === "::ffff:127.0.0.1") {
+    clientIP = "127.0.0.1";
+  }
+
+  // x-forwarded-for 헤더에서 첫 번째 IP 추출 (프록시 통과 시)
+  if (clientIP && clientIP.includes(",")) {
+    clientIP = clientIP.split(",")[0].trim();
+  }
+
+  // IPv6 매핑된 IPv4 주소 처리
+  if (clientIP && clientIP.startsWith("::ffff:")) {
+    clientIP = clientIP.replace("::ffff:", "");
+  }
+
+  return reply.send({
+    ip: clientIP || "unknown",
+    success: true,
+  });
+});
 
 // 메인 페이지
 fastify.get("/", async (request, reply) => {
@@ -289,7 +420,7 @@ fastify.get("/api/progress/:sessionId", async (request, reply) => {
 // 임시 세션 생성
 fastify.post("/api/create-session", async (request, reply) => {
   const sessionId = uuidv4();
-  
+
   // 임시 디렉토리 생성
   const tempDir = tmp.dirSync({ unsafeCleanup: true });
   const extractDir = path.join(tempDir.name, "extracted");
@@ -300,12 +431,14 @@ fastify.post("/api/create-session", async (request, reply) => {
     tempDir: tempDir.name,
     extractDir,
     files: [],
-    folders: [{
-      name: "(루트 폴더)",
-      path: "",
-      type: "folder",
-      modified: new Date(),
-    }],
+    folders: [
+      {
+        name: "(루트 폴더)",
+        path: "",
+        type: "folder",
+        modified: new Date(),
+      },
+    ],
   });
 
   // 10분 후 자동 정리
