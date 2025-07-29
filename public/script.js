@@ -463,7 +463,6 @@ class ZipPdfManager {
       return;
     }
 
-
     const fileItems = files
       .map((file) => {
         const fileSize = this.formatFileSize(file.size);
@@ -471,7 +470,7 @@ class ZipPdfManager {
 
         return `
                 <div class="file-item">
-                    <div class="file-name">${file.name}</div>
+                    <div class="file-name clickable-filename" onclick="zipManager.copyFileLink('${file.name}')" title="클릭하여 다운로드 링크 복사">${file.name}</div>
                     <div class="file-details">
                         <span class="file-size">${fileSize}</span>
                         <span class="file-date">${fileDate}</span>
@@ -483,6 +482,9 @@ class ZipPdfManager {
 
     fileList.innerHTML = `
             <h3>총 ${files.length}개의 파일</h3>
+            <div class="file-list-info">
+              <p>💡 파일명을 클릭하면 다운로드 링크가 복사됩니다</p>
+            </div>
             ${fileItems}
         `;
   }
@@ -556,7 +558,7 @@ class ZipPdfManager {
 
   async addFile() {
     const addBtn = document.getElementById("addFileBtn");
-    
+
     // 이미 업로드 중인지 확인
     if (addBtn.disabled) {
       return;
@@ -634,7 +636,6 @@ class ZipPdfManager {
       } else {
         this.showError(data.error || "PDF 추가 중 오류가 발생했습니다.");
       }
-
     } catch (error) {
       console.error("PDF 추가 오류:", error);
       this.showError("서버와 통신 중 오류가 발생했습니다.");
@@ -825,10 +826,10 @@ class ZipPdfManager {
 
     // FileList를 배열로 변환
     const fileArray = Array.from(files);
-    
-    uploadArea.classList.add('has-files');
-    
-    let fileListHtml = '';
+
+    uploadArea.classList.add("has-files");
+
+    let fileListHtml = "";
     if (fileArray.length === 1) {
       const file = fileArray[0];
       const fileSize = this.formatFileSize(file.size);
@@ -843,16 +844,18 @@ class ZipPdfManager {
     } else {
       const totalSize = fileArray.reduce((sum, file) => sum + file.size, 0);
       const formattedTotalSize = this.formatFileSize(totalSize);
-      
-      const fileItems = fileArray.map(file => {
-        const fileSize = this.formatFileSize(file.size);
-        return `
+
+      const fileItems = fileArray
+        .map((file) => {
+          const fileSize = this.formatFileSize(file.size);
+          return `
           <div class="uploaded-file-item">
             <span class="uploaded-file-name">${file.name}</span>
             <span class="uploaded-file-size">${fileSize}</span>
           </div>
         `;
-      }).join('');
+        })
+        .join("");
 
       fileListHtml = `
         <div class="uploaded-files-list">
@@ -871,14 +874,17 @@ class ZipPdfManager {
     const uploadArea = document.getElementById(uploadAreaId);
     if (!uploadArea) return;
 
-    uploadArea.classList.remove('has-files');
-    
+    uploadArea.classList.remove("has-files");
+
     // 업로드 영역에 따른 텍스트 설정
     let uploadText = "파일을 드래그하여 놓거나";
-    if (uploadAreaId === "directFileUploadArea" || uploadAreaId === "serverFileUploadArea") {
+    if (
+      uploadAreaId === "directFileUploadArea" ||
+      uploadAreaId === "serverFileUploadArea"
+    ) {
       uploadText = "파일(들)을 드래그하여 놓거나";
     }
-    
+
     // 원래의 업로드 영역 UI로 복원
     uploadArea.innerHTML = `
       <div class="upload-icon">+</div>
@@ -888,7 +894,6 @@ class ZipPdfManager {
       </p>
     `;
   }
-
 
   // 실제 작업 진행률 폴링
   async pollOperationProgress(sessionId, progressId, onComplete) {
@@ -1036,13 +1041,23 @@ class ZipPdfManager {
         const fileType = file.type === "directory" ? "[폴더]" : "[파일]";
 
         // 파일인 경우에만 삭제 버튼 표시
-        const deleteButton = file.type === "file" 
-          ? `<button class="delete-btn" onclick="zipManager.deleteServerFile('${file.name}')" title="파일 삭제">×</button>`
-          : "";
+        const deleteButton =
+          file.type === "file"
+            ? `<button class="delete-btn" onclick="zipManager.deleteServerFile('${file.name}')" title="파일 삭제">×</button>`
+            : "";
 
         return `
           <div class="file-item">
-            <div class="file-name">${fileType} ${file.name}</div>
+            <div class="file-name ${
+              file.type === "file" ? "clickable-filename" : ""
+            }" 
+                 ${
+                   file.type === "file"
+                     ? `onclick="zipManager.copyFileLink('${file.name}')" title="클릭하여 다운로드 링크 복사"`
+                     : ""
+                 }>
+              ${fileType} ${file.name}
+            </div>
             <div class="file-details">
               ${
                 file.type === "file"
@@ -1064,7 +1079,7 @@ class ZipPdfManager {
   // FTP 서버에 업로드
   async uploadToServer() {
     const uploadBtn = document.getElementById("compressedUploadBtn");
-    
+
     // 이미 업로드 중인지 확인
     if (uploadBtn.disabled) {
       return;
@@ -1248,15 +1263,16 @@ class ZipPdfManager {
     }, 100);
   }
 
-
   // 직접 파일 선택 처리
   handleDirectFileSelect(event) {
     if (!event.target) return;
     const files = event.target.files;
     if (files && files.length > 0) {
       this.updateFileUploadDisplay("directFileUploadArea", files);
-      
-      const directFilenameInput = document.getElementById("directRemoteFilename");
+
+      const directFilenameInput = document.getElementById(
+        "directRemoteFilename"
+      );
       if (directFilenameInput) {
         if (files.length === 1) {
           // 단일 파일인 경우 파일명 자동 설정
@@ -1272,7 +1288,7 @@ class ZipPdfManager {
   // 직접 업로드 실행
   async directUpload() {
     const uploadBtn = document.getElementById("directUploadBtn");
-    
+
     // 이미 업로드 중인지 확인
     if (uploadBtn.disabled) {
       return;
@@ -1284,7 +1300,8 @@ class ZipPdfManager {
       .value.trim();
 
     // 드래그 앤 드롭으로 선택된 파일이 있으면 그것을 사용, 없으면 input에서 가져오기
-    const selectedFiles = this.directFiles || (fileInput ? fileInput.files : null);
+    const selectedFiles =
+      this.directFiles || (fileInput ? fileInput.files : null);
 
     if (!selectedFiles || selectedFiles.length === 0) {
       alert("업로드할 파일을 선택해주세요.");
@@ -1499,18 +1516,18 @@ class ZipPdfManager {
   resetDirectUploadState() {
     // 직접 업로드 진행률 숨기기
     this.hideProgress("directUploadProgress");
-    
+
     // 직접 업로드 버튼 활성화
     const directUploadBtn = document.getElementById("directUploadBtn");
     this.enableUploadButton(directUploadBtn, "SFTP 서버에 업로드");
-    
+
     // 직접 업로드 결과 숨기기
     const directUploadResult = document.getElementById("directUploadResult");
     if (directUploadResult) directUploadResult.classList.add("hidden");
-    
+
     // 직접 업로드 폼 리셋
     this.resetDirectUpload();
-    
+
     // 에러/상태 메시지 숨기기
     this.hideMessages();
   }
@@ -1520,7 +1537,7 @@ class ZipPdfManager {
     const directFileInput = document.getElementById("directFile");
     const directFilenameInput = document.getElementById("directRemoteFilename");
     const directUploadResult = document.getElementById("directUploadResult");
-    
+
     if (directFileInput) directFileInput.value = "";
     if (directFilenameInput) directFilenameInput.value = "";
     if (directUploadResult) directUploadResult.classList.add("hidden");
@@ -1534,8 +1551,10 @@ class ZipPdfManager {
     const files = event.target.files;
     if (files && files.length > 0) {
       this.updateFileUploadDisplay("serverFileUploadArea", files);
-      
-      const serverFilenameInput = document.getElementById("serverRemoteFilename");
+
+      const serverFilenameInput = document.getElementById(
+        "serverRemoteFilename"
+      );
       if (serverFilenameInput) {
         if (files.length === 1) {
           // 단일 파일인 경우 파일명 자동 설정
@@ -1551,7 +1570,7 @@ class ZipPdfManager {
   // 서버 파일 업로드
   async serverFileUpload() {
     const uploadBtn = document.getElementById("serverUploadBtn");
-    
+
     // 이미 업로드 중인지 확인
     if (uploadBtn.disabled) {
       return;
@@ -1563,7 +1582,8 @@ class ZipPdfManager {
       .value.trim();
 
     // 드래그 앤 드롭으로 선택된 파일이 있으면 그것을 사용, 없으면 input에서 가져오기
-    const selectedFiles = this.serverFiles || (fileInput ? fileInput.files : null);
+    const selectedFiles =
+      this.serverFiles || (fileInput ? fileInput.files : null);
 
     if (!selectedFiles || selectedFiles.length === 0) {
       alert("업로드할 파일을 선택해주세요.");
@@ -1659,8 +1679,10 @@ class ZipPdfManager {
       }, 1000);
       // 폼 리셋
       const serverFileInput = document.getElementById("serverFile");
-      const serverFilenameInput = document.getElementById("serverRemoteFilename");
-      
+      const serverFilenameInput = document.getElementById(
+        "serverRemoteFilename"
+      );
+
       if (serverFileInput) serverFileInput.value = "";
       if (serverFilenameInput) serverFilenameInput.value = "";
       this.serverFiles = null;
@@ -1768,8 +1790,10 @@ class ZipPdfManager {
       }, 1000);
       // 폼 리셋
       const serverFileInput = document.getElementById("serverFile");
-      const serverFilenameInput = document.getElementById("serverRemoteFilename");
-      
+      const serverFilenameInput = document.getElementById(
+        "serverRemoteFilename"
+      );
+
       if (serverFileInput) serverFileInput.value = "";
       if (serverFilenameInput) serverFilenameInput.value = "";
       this.serverFiles = null;
@@ -1794,7 +1818,8 @@ class ZipPdfManager {
   enableUploadButton(button, originalText) {
     if (button) {
       button.disabled = false;
-      button.textContent = originalText || button.dataset.originalText || button.textContent;
+      button.textContent =
+        originalText || button.dataset.originalText || button.textContent;
       button.style.opacity = "1";
       button.style.cursor = "pointer";
       delete button.dataset.originalText;
@@ -1846,14 +1871,14 @@ class ZipPdfManager {
     // 파일 추가 버튼 활성화
     const addBtn = document.getElementById("addFileBtn");
     this.enableUploadButton(addBtn, "파일 추가");
-    
+
     // 파일 업로드 영역 리셋
     this.resetFileUploadArea();
-    
+
     // 입력 필드 초기화
     document.getElementById("filename").value = "";
     document.getElementById("targetFolder").selectedIndex = 0;
-    
+
     this.hideMessages();
   }
 
@@ -1861,15 +1886,15 @@ class ZipPdfManager {
   resetStep4State() {
     // 재압축 진행률 숨기기
     this.hideProgress("recompressProgress");
-    
+
     // 재압축 버튼 활성화
     const recompressBtn = document.getElementById("recompressBtn");
     this.enableUploadButton(recompressBtn, "재압축");
-    
+
     // 다운로드 결과 숨기기
     const downloadResult = document.getElementById("downloadResult");
     if (downloadResult) downloadResult.classList.add("hidden");
-    
+
     this.hideMessages();
   }
 
@@ -1877,25 +1902,25 @@ class ZipPdfManager {
   resetStep5State() {
     // 업로드 진행률 숨기기
     this.hideProgress("uploadProgress");
-    
+
     // 모든 업로드 버튼 활성화
     const compressedUploadBtn = document.getElementById("compressedUploadBtn");
     const serverUploadBtn = document.getElementById("serverUploadBtn");
-    
+
     this.enableUploadButton(compressedUploadBtn, "재압축된 파일 업로드");
     this.enableUploadButton(serverUploadBtn, "파일 업로드");
-    
+
     // 업로드 결과 숨기기
     const uploadResult = document.getElementById("uploadResult");
     if (uploadResult) uploadResult.classList.add("hidden");
-    
+
     // 서버 파일 목록 숨기기
     const serverFileList = document.getElementById("serverFileList");
     if (serverFileList) serverFileList.classList.add("hidden");
-    
+
     // 서버 파일 업로드 영역 리셋
     this.resetServerFileUploadArea();
-    
+
     this.hideMessages();
   }
 
@@ -1903,10 +1928,10 @@ class ZipPdfManager {
   resetFileUploadArea() {
     const fileUploadArea = document.getElementById("fileUploadArea");
     const fileInput = document.getElementById("fileInput");
-    
+
     if (fileInput) fileInput.value = "";
     this.selectedFile = null;
-    
+
     if (fileUploadArea) {
       fileUploadArea.innerHTML = `
         <div class="upload-icon">+</div>
@@ -1924,11 +1949,13 @@ class ZipPdfManager {
   // 서버 파일 업로드 영역 리셋
   resetServerFileUploadArea() {
     const serverFileInput = document.getElementById("serverFile");
-    const serverRemoteFilename = document.getElementById("serverRemoteFilename");
-    
+    const serverRemoteFilename = document.getElementById(
+      "serverRemoteFilename"
+    );
+
     if (serverFileInput) serverFileInput.value = "";
     if (serverRemoteFilename) serverRemoteFilename.value = "";
-    
+
     this.serverFiles = null;
     this.resetFileUploadDisplay("serverFileUploadArea");
   }
@@ -1937,7 +1964,7 @@ class ZipPdfManager {
   hideMessages() {
     const statusMessage = document.getElementById("statusMessage");
     const errorMessage = document.getElementById("errorMessage");
-    
+
     if (statusMessage) statusMessage.classList.add("hidden");
     if (errorMessage) errorMessage.classList.add("hidden");
   }
@@ -1945,17 +1972,19 @@ class ZipPdfManager {
   // 서버 파일 삭제
   async deleteServerFile(filename) {
     // 삭제 확인
-    const confirmDelete = confirm(`'${filename}' 파일을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`);
-    
+    const confirmDelete = confirm(
+      `'${filename}' 파일을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+    );
+
     if (!confirmDelete) {
       return;
     }
 
     try {
       console.log("파일 삭제 요청:", filename);
-      
+
       this.showStatus("파일 삭제 중...");
-      
+
       const response = await fetch("/api/delete-server-file", {
         method: "POST",
         headers: {
@@ -1972,10 +2001,10 @@ class ZipPdfManager {
       }
 
       const result = await response.json();
-      
+
       if (result.success) {
         this.showStatus(result.message);
-        
+
         // 파일 목록 새로고침
         setTimeout(() => {
           this.browseServerFolder();
@@ -1987,6 +2016,66 @@ class ZipPdfManager {
       console.error("파일 삭제 오류:", error);
       this.showError(`파일 삭제 중 오류가 발생했습니다: ${error.message}`);
     }
+  }
+
+  // 파일 다운로드 링크 복사
+  async copyFileLink(filename) {
+    try {
+      // 다운로드 링크 생성
+      const downloadUrl = `https://download.acghr.co.kr/test/${filename}`;
+
+      // 클립보드에 복사
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(downloadUrl);
+      } else {
+        // 폴백: 텍스트 영역을 사용한 복사
+        const textArea = document.createElement("textarea");
+        textArea.value = downloadUrl;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+
+      // 토스트 알림 표시
+      this.showToast(`${filename} 링크가 복사되었습니다!`, "success");
+    } catch (error) {
+      console.error("링크 복사 오류:", error);
+      this.showToast(`❌ 링크 복사에 실패했습니다: ${error.message}`, "error");
+    }
+  }
+
+  // 토스트 알림 표시
+  showToast(message, type = "success") {
+    // 기존 토스트 제거
+    const existingToast = document.querySelector(".toast");
+    if (existingToast) {
+      existingToast.remove();
+    }
+
+    // 새 토스트 생성
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+
+    document.body.appendChild(toast);
+
+    // 애니메이션을 위해 약간 지연 후 show 클래스 추가
+    setTimeout(() => {
+      toast.classList.add("show");
+    }, 100);
+
+    // 3초 후 자동으로 제거
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.remove();
+        }
+      }, 300); // 애니메이션 시간
+    }, 3000);
   }
 }
 
