@@ -48,6 +48,8 @@ class ZipPdfManager {
     document.getElementById("backToStep1").addEventListener("click", () => {
       this.showStep(1);
       this.backToMainFromServer();
+      // 1단계로 돌아갈 때 다운로드 컨트롤 다시 보이기
+      this.showDownloadControls();
     });
 
     document.getElementById("backToStep2").addEventListener("click", () => {
@@ -295,6 +297,12 @@ class ZipPdfManager {
       return;
     }
 
+    // 다운로드 버튼 숨기기
+    const downloadBtn = document.getElementById("downloadBtn");
+    if (downloadBtn) {
+      downloadBtn.classList.add("hidden");
+    }
+
     // skipToUpload 섹션 숨기기
     const skipToUpload = document.getElementById("skipToUpload");
     if (skipToUpload) {
@@ -315,11 +323,29 @@ class ZipPdfManager {
         this.waitForCompletion(data.sessionId, url);
       } else {
         this.showError(data.error || "다운로드 중 오류가 발생했습니다.");
+        this.hideProgress("downloadProgress");
+        // 에러 시 다운로드 버튼과 skipToUpload 섹션 다시 보이기
+        this.showDownloadControls();
       }
     } catch (error) {
       console.error("다운로드 오류:", error);
       this.showError("서버와 통신 중 오류가 발생했습니다.");
       this.hideProgress("downloadProgress");
+      // 에러 시 다운로드 버튼과 skipToUpload 섹션 다시 보이기
+      this.showDownloadControls();
+    }
+  }
+
+  // 다운로드 컨트롤 다시 보이기
+  showDownloadControls() {
+    const downloadBtn = document.getElementById("downloadBtn");
+    if (downloadBtn) {
+      downloadBtn.classList.remove("hidden");
+    }
+
+    const skipToUpload = document.getElementById("skipToUpload");
+    if (skipToUpload) {
+      skipToUpload.classList.remove("hidden");
     }
   }
 
@@ -354,12 +380,16 @@ class ZipPdfManager {
               progressData.error || "다운로드 중 오류가 발생했습니다."
             );
             this.hideProgress("downloadProgress");
+            // 에러 시 다운로드 버튼과 skipToUpload 섹션 다시 보이기
+            this.showDownloadControls();
           }
         }
       } catch (error) {
         console.error("완료 확인 오류:", error);
         clearInterval(checkInterval);
         this.hideProgress("downloadProgress");
+        // 에러 시 다운로드 버튼과 skipToUpload 섹션 다시 보이기
+        this.showDownloadControls();
       }
     }, 1000); // 1초마다 확인
 
@@ -368,6 +398,8 @@ class ZipPdfManager {
       clearInterval(checkInterval);
       this.showError("다운로드 시간이 초과되었습니다.");
       this.hideProgress("downloadProgress");
+      // 타임아웃 시 다운로드 버튼과 skipToUpload 섹션 다시 보이기
+      this.showDownloadControls();
     }, 5 * 60 * 1000);
   }
 

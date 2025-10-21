@@ -19,24 +19,80 @@ body {
   padding: 40px 20px;
 }
 
-/* 헤더 */
-header {
+/* 메인 헤더 */
+.main-header {
   text-align: center;
-  margin-bottom: 50px;
+  margin-bottom: 40px;
+  padding: 24px 0;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
 }
 
-header h1 {
-  font-size: 2rem;
-  font-weight: 300;
-  color: #222;
+.header-content h1 {
+  font-size: 1.8rem;
+  font-weight: 500;
   margin-bottom: 8px;
   letter-spacing: -0.5px;
+  color: #333;
 }
 
-header p {
+.header-subtitle {
   font-size: 1rem;
   color: #666;
   font-weight: 400;
+  margin: 0;
+}
+
+/* 메인 카드 */
+.main-card {
+  background: white;
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e9ecef;
+}
+
+.card-section {
+  padding: 24px 0;
+}
+
+.card-section:first-child {
+  padding-top: 0;
+}
+
+.card-section:last-child {
+  padding-bottom: 0;
+}
+
+.section-icon {
+  display: none;
+}
+
+.card-section h3 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.section-description {
+  color: #666;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.warning-text {
+  color: #d63384;
+  font-size: 11px;
+  text-align: center;
+  padding: 12px;
+  border-radius: 6px;
 }
 
 /* 단계 섹션 */
@@ -95,7 +151,16 @@ header p {
 
 /* 입력 그룹 */
 .input-group {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
   margin-bottom: 24px;
+}
+
+.input-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .input-group label {
@@ -117,7 +182,8 @@ header p {
   transition: border-color 0.2s ease;
   background: white;
   color: #333;
-  margin-top: 10px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
 }
 
 .input-group input:focus,
@@ -142,6 +208,7 @@ header p {
   margin-top: 12px;
   display: inline-block;
   text-decoration: none;
+  border: 1px solid transparent;
 }
 
 .btn.primary {
@@ -386,7 +453,6 @@ header p {
 /* 파일 목록 안내 메시지 */
 .file-list-info {
   background: #f8f9fa;
-  border: 1px solid #e9ecef;
   border-radius: 6px;
   padding: 12px 16px;
   margin-bottom: 16px;
@@ -397,8 +463,8 @@ header p {
   font-size: 13px;
   color: #666;
   display: flex;
-  align-items: center;
   gap: 8px;
+  justify-content: center;
 }
 
 /* 토스트 알림 스타일 */
@@ -553,8 +619,33 @@ header p {
     padding: 20px 16px;
   }
 
-  header h1 {
+  .main-header {
+    margin-bottom: 24px;
+    padding: 20px 16px;
+  }
+
+  .header-content h1 {
     font-size: 1.5rem;
+  }
+
+  .header-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .main-card {
+    padding: 24px 20px;
+  }
+
+  .section-icon {
+    font-size: 2rem;
+  }
+
+  .card-section h3 {
+    font-size: 1.2rem;
+  }
+
+  .section-description {
+    font-size: 14px;
   }
 
   .step {
@@ -574,11 +665,20 @@ header p {
   .file-details {
     gap: 12px;
   }
+
+  .input-wrap {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .btn.primary {
+    width: 100%;
+  }
 }
 
 .divider {
   text-align: center;
-  margin: 30px 0;
+  margin: 32px 0;
   position: relative;
 }
 
@@ -589,37 +689,45 @@ header p {
   left: 0;
   right: 0;
   height: 1px;
-  background: #e5e5e5;
+  background: linear-gradient(to right, transparent, #e5e5e5, transparent);
   z-index: 1;
 }
 
 .divider span {
   background: white;
-  padding: 0 16px;
-  color: #999;
-  font-size: 0.9rem;
+  padding: 0 20px;
+  color: #888;
+  font-size: 14px;
+  font-weight: 500;
   position: relative;
   z-index: 2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .skip-buttons {
   display: flex;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 /* 버튼 스타일 확장 */
 .btn.outline {
+  width: 100%;
   background: white;
   color: #555;
-  border: 1px solid #ddd;
-  padding: 12px 20px;
-  font-size: 0.9rem;
+  border: 1px solid #e9ecef;
+  padding: 12px 24px;
+  font-size: 14px;
+  height: 44px;
+  box-sizing: border-box;
 }
 
 .btn.outline:hover {
-  background: #f8f8f8;
-  border-color: #ccc;
+  background: #f8f9fa;
+  border-color: #dee2e6;
   color: #333;
 }
 
@@ -737,6 +845,11 @@ header p {
   }
 
   .btn.outline {
+    width: 100%;
+    text-align: center;
+  }
+
+  .btn.primary {
     width: 100%;
     text-align: center;
   }

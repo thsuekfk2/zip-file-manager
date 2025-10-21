@@ -8,30 +8,31 @@
   </head>
   <body>
     <div class="container">
+      <!-- 헤더 추가 -->
+      <header class="main-header">
+        <div class="header-content">
+          <h1>응용프로그램 관리 도구</h1>
+          <p class="header-subtitle">응용프로그램 파일 조회, 수정, 업로드</p>
+        </div>
+      </header>
+
       <main>
         <!-- 단계 1: ZIP 파일 다운로드 -->
         <section id="step1" class="step active">
-          <div class="input-group">
-            <h3>기존 링크에 파일을 추가 / 변경</h3>
-            <input
-              type="url"
-              id="zipUrl"
-              placeholder="https://example.com/file.zip"
-              required
-            />
-            <button id="downloadBtn" class="btn primary">다운로드</button>
-          </div>
-
-          <!-- 압축 건너뛰기 옵션 -->
-          <div id="skipToUpload">
-            <div class="divider"><span>OR</span></div>
-            <div class="skip-group">
-              <h3>새로운 파일을 추가</h3>
-              <div class="skip-buttons">
-                <button id="skipToUploadBtn" class="btn outline">
-                  서버 파일 조회 & 직접 업로드
-                </button>
-              </div>
+          <div class="card-section">
+            <h3>기존 파일 수정하기</h3>
+            <p class="section-description">
+              다운로드 링크를 입력하여 파일을 다운로드하고 수정 후 재압축,
+              업로드 할 수 있습니다
+            </p>
+            <div class="input-group">
+              <input
+                type="url"
+                id="zipUrl"
+                placeholder="https://example.com/file.zip"
+                required
+              />
+              <button id="downloadBtn" class="btn primary">다운로드</button>
             </div>
           </div>
 
@@ -40,6 +41,23 @@
               <div class="progress-fill"></div>
             </div>
             <div class="progress-text">다운로드 중...</div>
+          </div>
+
+          <div id="skipToUpload">
+            <div class="divider"><span>또는</span></div>
+
+            <div class="card-section">
+              <h3>새 파일 업로드하기</h3>
+              <p class="section-description">
+                서버의 기존 파일을 확인하거나 새로운 파일을 직접 업로드할 수
+                있습니다
+              </p>
+              <div class="skip-buttons">
+                <button id="skipToUploadBtn" class="btn outline">
+                  서버 파일 조회 & 업로드
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -267,7 +285,13 @@
           <!-- 새 파일 업로드 섹션 (서버 파일 조회 버튼을 누르면 표시) -->
           <div class="server-upload-section hidden">
             <div class="input-group">
-              <label for="serverFile">업로드 파일 선택</label>
+              <label for="serverFile">
+                업로드 파일 선택
+                <span class="warning-text"
+                  >( 동일한 이름으로 업로드 시 기존 파일이 덮어씌워집니다
+                  )</span
+                >
+              </label>
               <div class="file-upload-area" id="serverFileUploadArea">
                 <div class="upload-icon">+</div>
                 <p>
