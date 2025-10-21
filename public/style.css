@@ -87,6 +87,10 @@ body {
   margin-right: auto;
 }
 
+.warning-color {
+  color: #d63384;
+}
+
 .warning-text {
   color: #d63384;
   font-size: 11px;
