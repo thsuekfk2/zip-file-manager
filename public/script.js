@@ -54,9 +54,11 @@ class ZipPdfManager {
       this.showStep(2);
     });
 
-    document.getElementById("backToStep3").addEventListener("click", () => {
-      this.showStep(3);
-    });
+    document
+      .getElementById("backToStep2FromStep4")
+      .addEventListener("click", () => {
+        this.showStep(2);
+      });
 
     document.getElementById("backToStep4").addEventListener("click", () => {
       this.backToMainFromServer();
@@ -343,8 +345,8 @@ class ZipPdfManager {
             this.showStatus(
               "ZIP 파일이 성공적으로 다운로드되고 압축 해제되었습니다."
             );
+            // 2단계에서 멈춰서 사용자가 선택할 수 있도록 함
             this.showStep(2);
-            setTimeout(() => this.showStep(3), 1000);
             this.hideProgress("downloadProgress");
           } else if (progressData.phase === "error") {
             clearInterval(checkInterval);
@@ -470,10 +472,11 @@ class ZipPdfManager {
 
         return `
                 <div class="file-item">
-                    <div class="file-name clickable-filename" onclick="zipManager.copyFileLink('${file.name}')" title="클릭하여 다운로드 링크 복사">${file.name}</div>
+                    <div class="file-name">${file.name}</div>
                     <div class="file-details">
                         <span class="file-size">${fileSize}</span>
                         <span class="file-date">${fileDate}</span>
+                        <button class="delete-btn" onclick="zipManager.deleteLocalFile('${file.name}')" title="파일 삭제">×</button>
                     </div>
                 </div>
             `;
@@ -481,11 +484,12 @@ class ZipPdfManager {
       .join("");
 
     fileList.innerHTML = `
-            <h3>총 ${files.length}개의 파일</h3>
-            <div class="file-list-info">
-              <p>💡 파일명을 클릭하면 다운로드 링크가 복사됩니다</p>
+            <div class="file-list-header">
+              <h3>총 ${files.length}개의 파일</h3>
+              <button class="add-file-btn" onclick="zipManager.openQuickFileSelector()" title="파일 추가">+</button>
             </div>
             ${fileItems}
+            <input type="file" id="quickFileInput" style="display: none;" onchange="zipManager.handleQuickFileAdd(event)">
         `;
   }
 
@@ -628,11 +632,14 @@ class ZipPdfManager {
 
       if (data.success) {
         this.showStatus(data.message);
+        // 파일 목록 업데이트 (기존 파일 목록 유지하면서 추가)
         this.displayFileList(data.files);
         if (data.folders) {
           this.populateFolderOptions(data.folders);
         }
+        // 파일이 추가되었음을 명확히 표시
         this.showStep(4);
+        this.showStatus("파일이 추가되었습니다. 이제 재압축할 수 있습니다.");
       } else {
         this.showError(data.error || "PDF 추가 중 오류가 발생했습니다.");
       }
@@ -721,8 +728,10 @@ class ZipPdfManager {
       step.classList.remove("active");
     });
 
-    // 이전 단계의 상태 리셋
-    this.resetStepState(this.currentStep);
+    // 현재 단계가 2보다 큰 경우에만 이전 단계 상태 리셋 (파일 목록 유지)
+    if (stepNumber > 2 && this.currentStep !== stepNumber) {
+      this.resetStepState(this.currentStep);
+    }
 
     // 현재 단계 표시
     const currentStep = document.getElementById(`step${stepNumber}`);
@@ -731,6 +740,9 @@ class ZipPdfManager {
     }
 
     this.currentStep = stepNumber;
+
+    // 단계별 진행 상황 표시
+    this.updateStepProgress(stepNumber);
   }
 
   showProgress(progressId, message, useSpinner = false) {
@@ -1860,9 +1872,9 @@ class ZipPdfManager {
     this.hideMessages();
   }
 
-  // 2단계 상태 리셋
+  // 2단계 상태 리셋 (파일 목록은 유지)
   resetStep2State() {
-    // 파일 목록 초기화는 필요 시에만
+    // 파일 목록은 유지하고 메시지만 숨김
     this.hideMessages();
   }
 
@@ -1967,6 +1979,42 @@ class ZipPdfManager {
 
     if (statusMessage) statusMessage.classList.add("hidden");
     if (errorMessage) errorMessage.classList.add("hidden");
+  }
+
+  // 로컬 파일 삭제 (압축 해제된 파일에서)
+  async deleteLocalFile(filename) {
+    if (!confirm(`'${filename}' 파일을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      this.showStatus("파일 삭제 중...");
+
+      const response = await fetch("/api/delete-local-file", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          filename: filename,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.showStatus("파일이 삭제되었습니다.");
+        this.displayFileList(data.files);
+        if (data.folders) {
+          this.populateFolderOptions(data.folders);
+        }
+      } else {
+        this.showError(data.error || "파일 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      this.showError("파일 삭제 중 오류가 발생했습니다.");
+    }
   }
 
   // 서버 파일 삭제
@@ -2076,6 +2124,215 @@ class ZipPdfManager {
         }
       }, 300); // 애니메이션 시간
     }, 3000);
+  }
+
+  // 퀵 파일 선택창 열기
+  openQuickFileSelector() {
+    const quickFileInput = document.getElementById("quickFileInput");
+    if (quickFileInput) {
+      quickFileInput.click();
+    }
+  }
+
+  // 퀵 파일 추가 처리
+  async handleQuickFileAdd(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 사용 가능한 폴더 목록 확인
+    const targetFolder = document.getElementById("targetFolder");
+    if (!targetFolder || targetFolder.children.length <= 1) {
+      this.showError(
+        "폴더 정보를 찾을 수 없습니다. 파일 목록을 다시 로드해주세요."
+      );
+      return;
+    }
+
+    // 기본적으로 첫 번째 실제 폴더 선택 (루트가 아닌 첫 번째 폴더)
+    let selectedFolder = "";
+    for (let i = 1; i < targetFolder.children.length; i++) {
+      const optionValue = targetFolder.children[i].value;
+      if (optionValue !== "") {
+        selectedFolder = optionValue;
+        break;
+      }
+    }
+
+    // 파일명 설정 (원본 파일명 사용)
+    const filename = file.name;
+
+    try {
+      // 파일 존재 여부 확인
+      const checkResponse = await fetch("/api/check-file-exists", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          filename: filename,
+          targetFolder: selectedFolder,
+        }),
+      });
+
+      if (checkResponse.ok) {
+        const checkData = await checkResponse.json();
+        if (checkData.exists) {
+          const confirmOverwrite = confirm(
+            `"${filename}" 파일이 ${
+              checkData.targetFolder || "선택한 폴더"
+            }에 이미 존재합니다.\n\n기존 파일을 덮어씌우시겠습니까?`
+          );
+          if (!confirmOverwrite) {
+            // 파일 입력 초기화
+            event.target.value = "";
+            return;
+          }
+        }
+      }
+
+      // 파일 추가 진행
+      const formData = new FormData();
+      formData.append("sessionId", this.sessionId);
+      formData.append("filename", filename);
+      formData.append("targetFolder", selectedFolder);
+      formData.append("uploadFile", file);
+
+      this.showStatus("파일을 추가하는 중...");
+
+      const response = await fetch("/api/add-file", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.showStatus("파일이 성공적으로 추가되었습니다!");
+        // 파일 목록 업데이트
+        this.displayFileList(data.files);
+        if (data.folders) {
+          this.populateFolderOptions(data.folders);
+        }
+      } else {
+        this.showError(data.error || "파일 추가 중 오류가 발생했습니다.");
+      }
+    } catch (error) {
+      console.error("퀵 파일 추가 오류:", error);
+      this.showError("파일 추가 중 오류가 발생했습니다: " + error.message);
+    } finally {
+      // 파일 입력 초기화
+      event.target.value = "";
+    }
+  }
+
+  // 2단계에서 재압축 (페이지 이동 없이)
+  async recompressInPlace() {
+    const outputFilename =
+      document.getElementById("outputFilename")?.value.trim() ||
+      "modified_archive.zip";
+
+    const recompressBtn = document.getElementById("recompressInPlaceBtn");
+    const originalText = recompressBtn.textContent;
+
+    try {
+      // 버튼 비활성화
+      recompressBtn.disabled = true;
+      recompressBtn.textContent = "압축 중...";
+
+      this.showProgress("inPlaceRecompressProgress", "압축 중...", true);
+
+      const response = await fetch("/api/recompress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          filename: outputFilename,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.showInPlaceDownloadResult(data.filename, data.size);
+        this.hideProgress("inPlaceRecompressProgress");
+        this.showStatus("압축이 완료되었습니다!");
+      } else {
+        this.showError(data.error || "압축 중 오류가 발생했습니다.");
+        this.hideProgress("inPlaceRecompressProgress");
+      }
+    } catch (error) {
+      console.error("재압축 오류:", error);
+      this.showError("서버와 통신 중 오류가 발생했습니다.");
+      this.hideProgress("inPlaceRecompressProgress");
+    } finally {
+      // 버튼 활성화
+      recompressBtn.disabled = false;
+      recompressBtn.textContent = originalText;
+    }
+  }
+
+  // 2단계 내에서 다운로드 결과 표시
+  showInPlaceDownloadResult(filename, size) {
+    const resultContainer = document.getElementById("inPlaceDownloadResult");
+    const resultMessage = document.getElementById("inPlaceResultMessage");
+    const finalDownloadBtn = document.getElementById("inPlaceFinalDownloadBtn");
+    const uploadToServerBtn = document.getElementById(
+      "inPlaceUploadToServerBtn"
+    );
+
+    finalDownloadBtn.setAttribute("data-filename", filename);
+
+    const formattedSize = this.formatFileSize(size);
+    resultMessage.textContent = `파일이 성공적으로 재압축되었습니다. (${formattedSize})`;
+
+    // 이벤트 리스너 설정 (중복 방지)
+    finalDownloadBtn.onclick = () => this.downloadFinalFile();
+    uploadToServerBtn.onclick = () => this.uploadToServerFromInPlace();
+
+    resultContainer.classList.remove("hidden");
+  }
+
+  // 2단계에서 서버 업로드로 이동
+  uploadToServerFromInPlace() {
+    this.setDefaultRemoteFilename();
+    this.showStep(5);
+    // 재압축된 파일 업로드 섹션 보이기
+    document
+      .querySelector(".compressed-file-upload-section")
+      .classList.remove("hidden");
+    // 서버 파일 업로드 섹션 숨기기
+    document.querySelector(".server-upload-section").classList.add("hidden");
+    // 페이지 진입 시 자동으로 서버 폴더 조회
+    setTimeout(() => {
+      this.browseServerFolder();
+    }, 100);
+  }
+
+  // 단계별 진행상황 표시
+  updateStepProgress(stepNumber) {
+    const stepTitles = {
+      1: "ZIP 파일 다운로드",
+      2: "압축 해제된 파일 목록 확인",
+      3: "파일 추가",
+      4: "재압축 및 다운로드",
+      5: "서버 업로드",
+    };
+
+    // 현재 단계 표시
+    if (stepTitles[stepNumber]) {
+      const statusMsg = `${stepTitles[stepNumber]} 진행 중...`;
+      console.log(statusMsg);
+
+      // 헤더에 현재 진행단계 표시 (선택사항)
+      const stepHeader = document.querySelector(`#step${stepNumber} h2`);
+      if (stepHeader && !stepHeader.dataset.originalText) {
+        stepHeader.dataset.originalText = stepHeader.textContent;
+        stepHeader.textContent = stepTitles[stepNumber];
+      }
+    }
   }
 }
 

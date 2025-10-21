@@ -8,20 +8,11 @@
   </head>
   <body>
     <div class="container">
-      <header>
-        <h1>응용프로그램 관리 도구</h1>
-        <p>
-          ZIP 파일을 다운로드하고 파일을 추가/변경하여 재압축할 수 있습니다.
-        </p>
-        <p>ZIP 파일을 바로 윈도우 서버에 직접 업로드할 수 있습니다.</p>
-      </header>
-
       <main>
         <!-- 단계 1: ZIP 파일 다운로드 -->
         <section id="step1" class="step active">
           <div class="input-group">
-            <h3>기존 파일을 추가 / 변경</h3>
-            <label for="zipUrl">URL로 ZIP파일 다운로드</label>
+            <h3>기존 링크에 파일을 추가 / 변경</h3>
             <input
               type="url"
               id="zipUrl"
@@ -58,7 +49,48 @@
             <button id="backToStep1" class="back-btn">&lt;</button>
             <h2>압축 해제된 파일 목록</h2>
           </div>
+          <div class="step-description">
+            <p>ZIP 파일이 성공적으로 다운로드되고 압축 해제되었습니다.</p>
+            <p>
+              아래에서 파일을 관리하고 추가하거나 바로 재압축할 수 있습니다.
+            </p>
+          </div>
           <div id="fileList" class="file-list"></div>
+          <div class="step-actions">
+            <button
+              onclick="zipManager.recompressInPlace()"
+              class="btn primary"
+              id="recompressInPlaceBtn"
+            >
+              재압축하기
+            </button>
+          </div>
+
+          <!-- 재압축 진행률 -->
+          <div id="inPlaceRecompressProgress" class="progress-container hidden">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text">압축 중...</div>
+          </div>
+
+          <!-- 재압축 완료 결과 -->
+          <div id="inPlaceDownloadResult" class="result-container hidden">
+            <div class="success-message">
+              <h3>압축 완료!</h3>
+              <p id="inPlaceResultMessage">
+                파일이 성공적으로 재압축되었습니다.
+              </p>
+              <div class="download-options">
+                <button id="inPlaceFinalDownloadBtn" class="btn success">
+                  다운로드
+                </button>
+                <button id="inPlaceUploadToServerBtn" class="btn primary">
+                  윈도우 서버에 업로드
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- 단계 3: 파일 추가 -->
@@ -103,7 +135,7 @@
         <!-- 단계 4: 재압축 및 다운로드 -->
         <section id="step4" class="step hidden">
           <div class="step-header">
-            <button id="backToStep3" class="back-btn">&lt;</button>
+            <button id="backToStep2FromStep4" class="back-btn">&lt;</button>
             <h2>재압축 및 다운로드</h2>
           </div>
           <div class="input-group">

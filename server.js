@@ -1061,6 +1061,75 @@ fastify.post("/api/check-server-file", async (request, reply) => {
   }
 });
 
+// 로컬 파일 삭제 (압축 해제된 파일에서)
+fastify.post("/api/delete-local-file", async (request, reply) => {
+  const { sessionId, filename } = request.body;
+
+  console.log("로컬 파일 삭제 요청:", { sessionId, filename });
+
+  try {
+    if (!sessionId || !filename) {
+      return reply.status(400).send({ error: "필수 데이터가 누락되었습니다." });
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return reply.status(404).send({ error: "세션을 찾을 수 없습니다." });
+    }
+
+    // 삭제할 파일 경로 찾기
+    let fileToDelete = null;
+    let filePath = null;
+
+    // 모든 폴더에서 해당 파일명 검색
+    for (const folder of session.folders) {
+      const targetPath = folder.path 
+        ? path.join(session.extractDir, folder.path) 
+        : session.extractDir;
+      const possibleFilePath = path.join(targetPath, filename);
+      
+      if (await fs.pathExists(possibleFilePath)) {
+        fileToDelete = filename;
+        filePath = possibleFilePath;
+        break;
+      }
+    }
+
+    if (!filePath || !await fs.pathExists(filePath)) {
+      return reply.status(404).send({ 
+        error: "삭제할 파일을 찾을 수 없습니다.",
+        filename: filename 
+      });
+    }
+
+    console.log(`파일 삭제 시작: ${filePath}`);
+
+    // 파일 삭제
+    await fs.remove(filePath);
+
+    console.log(`파일 삭제 완료: ${filePath}`);
+
+    // 파일 목록 업데이트
+    const { files, folders } = await getFileList(session.extractDir);
+    session.files = files;
+    session.folders = folders;
+
+    return reply.send({
+      success: true,
+      message: `파일 '${filename}'이 성공적으로 삭제되었습니다.`,
+      filename: filename,
+      files: session.files,
+      folders: session.folders,
+    });
+  } catch (error) {
+    console.error("로컬 파일 삭제 오류:", error);
+    return reply.status(500).send({
+      error: "파일 삭제 중 오류가 발생했습니다.",
+      details: error.message,
+    });
+  }
+});
+
 // SFTP 서버 파일 삭제
 fastify.post("/api/delete-server-file", async (request, reply) => {
   const { filename } = request.body;

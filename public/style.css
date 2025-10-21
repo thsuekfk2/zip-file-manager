@@ -117,6 +117,7 @@ header p {
   transition: border-color 0.2s ease;
   background: white;
   color: #333;
+  margin-top: 10px;
 }
 
 .input-group input:focus,
@@ -301,11 +302,53 @@ header p {
   border: 1px solid #f0f0f0;
 }
 
+.file-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .file-list h3 {
   color: #333;
-  margin-bottom: 16px;
+  margin: 0;
   font-size: 1rem;
   font-weight: 500;
+}
+
+.add-file-btn {
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.add-file-btn:hover {
+  background: #0056b3;
+  transform: scale(1.05);
+}
+
+/* 다운로드 옵션 버튼들 */
+.download-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  justify-content: center;
+}
+
+.download-options .btn {
+  flex: 1;
+  max-width: 200px;
 }
 
 .file-item {
@@ -654,6 +697,39 @@ header p {
   padding: 12px 8px;
 }
 
+/* 단계 설명 */
+.step-description {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.step-description p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.step-description p:last-child {
+  margin-bottom: 0;
+}
+
+/* 단계별 액션 버튼 */
+.step-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.step-actions .btn {
+  flex: 1;
+  min-width: 140px;
+}
+
 /* 반응형 */
 @media (max-width: 640px) {
   .skip-buttons {
@@ -669,5 +745,13 @@ header p {
     width: 32px;
     height: 32px;
     font-size: 18px;
+  }
+
+  .step-actions {
+    flex-direction: column;
+  }
+
+  .step-actions .btn {
+    min-width: auto;
   }
 }
