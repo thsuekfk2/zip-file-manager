@@ -361,30 +361,83 @@
           <button id="closeHelpModal" class="close-btn">&times;</button>
         </div>
         <div class="modal-body">
-          <div class="guide-steps">
-            <h2>동일한 링크를 사용하면서 파일 수정하기</h2>
-            <div class="guide-step">
-              <h3>1. 수정 할 링크 입력 후 다운로드</h3>
-              <p>
-                수정할 링크를 입력한 후 '<strong>다운로드</strong>' 버튼을
-                누릅니다
-              </p>
+          <!-- 탭 네비게이션 -->
+          <div class="tab-navigation">
+            <button id="tab1" class="tab-btn active" data-tab="modify">
+              동일한 링크를 사용하면서 파일 수정하기
+            </button>
+            <button id="tab2" class="tab-btn" data-tab="upload">
+              새 파일 업로드
+            </button>
+          </div>
+
+          <!-- 탭 컨텐츠 -->
+          <div class="tab-content">
+            <!-- 첫 번째 탭: 파일 수정하기 -->
+            <div id="modify-tab" class="tab-panel active">
+              <div class="guide-steps">
+                <div class="guide-step">
+                  <h3>1. 수정할 링크 입력 후 다운로드</h3>
+                  <p>
+                    수정할 링크를 입력한 후 '<strong>다운로드</strong>' 버튼을
+                    누릅니다
+                  </p>
+                </div>
+                <div class="guide-step">
+                  <h3>2. 파일 삭제 및 업로드</h3>
+                  <p>
+                    압축 해제된 파일에서 <strong>X</strong> 버튼을 눌러서
+                    삭제하거나, <strong>+</strong> 버튼을 눌러서 새 파일을
+                    업로드합니다.
+                  </p>
+                </div>
+                <div class="guide-step">
+                  <h3>3. 재압축</h3>
+                  <p>'<strong>재압축하기</strong>' 버튼을 누릅니다</p>
+                </div>
+                <div class="guide-step">
+                  <h3>4. 서버 업로드</h3>
+                  <p>'<strong>윈도우 서버에 업로드</strong>' 버튼을 누릅니다</p>
+                </div>
+              </div>
             </div>
-            <div class="guide-step">
-              <h3>2. 파일 삭제 및 업로드</h3>
-              <p>
-                압축 해제된 파일에서
-                <strong>X</strong> 버튼을 눌러서 삭제 하거나,
-                <strong>+</strong> 버튼을 눌러서 새 파일을 업로드합니다.
-              </p>
-            </div>
-            <div class="guide-step">
-              <h3>3. 재압축</h3>
-              <p>'<strong>재압축하기</strong>' 버튼을 누릅니다</p>
-            </div>
-            <div class="guide-step">
-              <h3>4. 서버 업로드</h3>
-              <p>'<strong>윈도우 서버에 업로드</strong>' 버튼을 누릅니다</p>
+
+            <!-- 두 번째 탭: 새 파일 업로드 -->
+            <div id="upload-tab" class="tab-panel">
+              <div class="guide-steps">
+                <div class="guide-step">
+                  <h3>1. 서버 파일 조회</h3>
+                  <p>
+                    '<strong>서버 파일 조회 / 삭제 / 업로드</strong>' 버튼을
+                    누릅니다
+                  </p>
+                </div>
+                <div class="guide-step">
+                  <h3>2. 기존 파일 관리</h3>
+                  <p>
+                    서버에 있는 기존 파일들을 확인하고, 필요하면
+                    <strong>X</strong> 버튼으로 삭제할 수 있습니다.
+                  </p>
+                </div>
+                <div class="guide-step">
+                  <h3>3. 새 파일 선택</h3>
+                  <p>업로드할 파일을 선택하고 서버 파일명을 입력합니다.</p>
+                  <p class="guide-note">
+                    💡 <strong>중요:</strong> 서버에 이미 존재하는 파일명과
+                    동일한 이름으로 업로드하면, 기존 파일이 새 파일로
+                    교체됩니다. 이렇게 하면 기존 다운로드 링크는 그대로
+                    유지되면서 파일 내용만 새로운 것으로 바뀝니다.
+                  </p>
+                </div>
+
+                <div class="guide-step">
+                  <h3>4. 파일 업로드</h3>
+                  <p>
+                    '<strong>파일 업로드</strong>' 버튼을 눌러 서버에
+                    업로드합니다
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

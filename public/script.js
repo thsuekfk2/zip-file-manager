@@ -46,6 +46,9 @@ class ZipPdfManager {
       });
     }
 
+    // 탭 이벤트 리스너 설정
+    this.setupTabListeners();
+
     // 1단계: ZIP 다운로드
     document.getElementById("downloadBtn").addEventListener("click", () => {
       this.downloadZip();
@@ -2396,6 +2399,43 @@ class ZipPdfManager {
         stepHeader.dataset.originalText = stepHeader.textContent;
         stepHeader.textContent = stepTitles[stepNumber];
       }
+    }
+  }
+
+  // 탭 이벤트 리스너 설정
+  setupTabListeners() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    
+    tabButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        const targetTab = e.target.dataset.tab;
+        this.switchTab(targetTab);
+      });
+    });
+  }
+
+  // 탭 전환 함수
+  switchTab(targetTab) {
+    // 모든 탭 버튼에서 active 클래스 제거
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    // 모든 탭 패널 숨기기
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+      panel.classList.remove('active');
+    });
+
+    // 선택된 탭 버튼 활성화
+    const selectedTabBtn = document.querySelector(`[data-tab="${targetTab}"]`);
+    if (selectedTabBtn) {
+      selectedTabBtn.classList.add('active');
+    }
+
+    // 선택된 탭 패널 표시
+    const selectedTabPanel = document.getElementById(`${targetTab}-tab`);
+    if (selectedTabPanel) {
+      selectedTabPanel.classList.add('active');
     }
   }
 }
