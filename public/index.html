@@ -11,7 +11,16 @@
       <!-- 헤더 추가 -->
       <header class="main-header">
         <div class="header-content">
-          <h1>응용프로그램 관리 도구</h1>
+          <h1>
+            응용프로그램 관리 도구
+            <button
+              id="sectionHelpBtn"
+              class="section-help-btn"
+              title="사용 방법 가이드"
+            >
+              ?
+            </button>
+          </h1>
         </div>
       </header>
 
@@ -19,12 +28,14 @@
         <!-- 단계 1: ZIP 파일 다운로드 -->
         <section id="step1" class="step active">
           <div class="card-section">
-            <h3>기존 파일 수정하기</h3>
+            <h3>동일한 링크를 사용하면서 파일 수정하기</h3>
             <p class="section-description">
-              다운로드 링크를 입력하여
+              수정 할 링크를 입력하여
               <span class="warning-color">파일을 다운로드</span>하고
-              <span class="warning-color">수정 후 재압축하여 업로드</span> 할 수
-              있습니다
+              <span class="warning-color"
+                >수정 후 재압축하여 서버에 업로드</span
+              >
+              할 수 있습니다
             </p>
             <div class="input-group">
               <input
@@ -56,7 +67,7 @@
               </p>
               <div class="skip-buttons">
                 <button id="skipToUploadBtn" class="btn outline">
-                  서버 파일 조회 & 업로드
+                  서버 파일 조회 / 삭제 / 업로드
                 </button>
               </div>
             </div>
@@ -340,6 +351,44 @@
 
       <!-- 에러 메시지 -->
       <div id="errorMessage" class="error-message hidden"></div>
+    </div>
+
+    <!-- 도움말 모달 -->
+    <div id="helpModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>사용 방법 가이드</h2>
+          <button id="closeHelpModal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="guide-steps">
+            <h2>동일한 링크를 사용하면서 파일 수정하기</h2>
+            <div class="guide-step">
+              <h3>1. 수정 할 링크 입력 후 다운로드</h3>
+              <p>
+                수정할 링크를 입력한 후 '<strong>다운로드</strong>' 버튼을
+                누릅니다
+              </p>
+            </div>
+            <div class="guide-step">
+              <h3>2. 파일 삭제 및 업로드</h3>
+              <p>
+                압축 해제된 파일에서
+                <strong>X</strong> 버튼을 눌러서 삭제 하거나,
+                <strong>+</strong> 버튼을 눌러서 새 파일을 업로드합니다.
+              </p>
+            </div>
+            <div class="guide-step">
+              <h3>3. 재압축</h3>
+              <p>'<strong>재압축하기</strong>' 버튼을 누릅니다</p>
+            </div>
+            <div class="guide-step">
+              <h3>4. 서버 업로드</h3>
+              <p>'<strong>윈도우 서버에 업로드</strong>' 버튼을 누릅니다</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="script.js"></script>

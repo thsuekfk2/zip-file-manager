@@ -14,6 +14,38 @@ class ZipPdfManager {
   }
 
   setupEventListeners() {
+    // 도움말 버튼 이벤트
+    const sectionHelpBtn = document.getElementById("sectionHelpBtn");
+    const helpModal = document.getElementById("helpModal");
+    const closeHelpModal = document.getElementById("closeHelpModal");
+
+    if (helpModal && closeHelpModal) {
+      // 섹션 도움말 버튼
+      if (sectionHelpBtn) {
+        sectionHelpBtn.addEventListener("click", () => {
+          helpModal.classList.add("show");
+        });
+      }
+
+      closeHelpModal.addEventListener("click", () => {
+        helpModal.classList.remove("show");
+      });
+
+      // 모달 배경 클릭 시 닫기
+      helpModal.addEventListener("click", (e) => {
+        if (e.target === helpModal) {
+          helpModal.classList.remove("show");
+        }
+      });
+
+      // ESC 키로 모달 닫기
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && helpModal.classList.contains("show")) {
+          helpModal.classList.remove("show");
+        }
+      });
+    }
+
     // 1단계: ZIP 다운로드
     document.getElementById("downloadBtn").addEventListener("click", () => {
       this.downloadZip();
